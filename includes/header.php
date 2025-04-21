@@ -23,7 +23,7 @@
             <!-- Contact Information -->
             <div class="text-sm">
                 <span class="block font-bold">Call any time</span>
-                <span>+1 916 284 9204</span>
+                <span> 9023217609</span>
             </div>
             </div>
         </div>

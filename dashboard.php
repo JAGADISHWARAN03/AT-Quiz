@@ -242,6 +242,12 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             <span>Quiz Categories</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="mail.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_categories ? 'active-nav' : '' ?>">
+                        <i class="fas fa-envelope w-5 text-center"></i>
+                            <span>Mail </span>
+                        </a>
+                    </li>
                 </ul>
             </nav>
         </aside>
