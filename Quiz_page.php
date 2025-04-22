@@ -5,9 +5,13 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Fetch questions and options from the database
+// Get the category from the query parameter
+$category_id = isset($_GET['category']) ? (int)$_GET['category'] : 0;
+
+// Fetch questions and options from the database based on the category
 $questions = [];
-$stmt = $conn->prepare("SELECT question_text, option_1, option_2, option_3, option_4 FROM questions"); // Replace 'questions' with your table name
+$stmt = $conn->prepare("SELECT question_text, option_1, option_2, option_3, option_4 FROM questions WHERE quiz_category = ?"); // Replace 'questions' with your table name
+$stmt->bind_param("i", $category_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -33,7 +37,7 @@ $conn->close();
 </head>
 <body class="bg-white">
     <!-- Header -->
-    <?php include 'includes/header.php'; // Updated path to the footer file ?>
+    <?php include 'includes/header.php'; ?>
 
     <!-- Timer -->
     

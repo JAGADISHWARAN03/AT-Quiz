@@ -71,7 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $option_2 = $conn->real_escape_string($_POST['option_2']);
             $option_3 = $conn->real_escape_string($_POST['option_3']);
             $option_4 = $conn->real_escape_string($_POST['option_4']);
-            $correct_options = isset($_POST['correct_option']) ? json_encode($_POST['correct_option']) : '[]'; // Convert selected checkboxes to JSON
+            
+            // Convert the array of correct options to a JSON string
+            $correct_options = isset($_POST['correct_option']) ? json_encode($_POST['correct_option']) : '[]';
 
             $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("isssssss", $quiz_category, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_options);
@@ -81,13 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $option_2 = $conn->real_escape_string($_POST['option_2']);
             $option_3 = $conn->real_escape_string($_POST['option_3']);
             $option_4 = $conn->real_escape_string($_POST['option_4']);
-            $correct_option = (int)$_POST['correct_option'];
+            
+            // Get the selected correct option
+            $correct_option = isset($_POST['correct_option']) ? (int)$_POST['correct_option'] : 0;
 
             $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("isssssii", $quiz_category, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_option);
         } elseif ($question_type === 'text') {
             // Handle text input
-            $text_answer = $conn->real_escape_string($_POST['text_answer']);
+            $text_answer = isset($_POST['text_answer']) ? $conn->real_escape_string($_POST['text_answer']) : '';
             $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, correct_option) VALUES (?, ?, ?, ?)");
             $stmt->bind_param("isss", $quiz_category, $question_text, $question_type, $text_answer);
         }
@@ -126,12 +130,13 @@ $result = $conn->query($query);
 
 // Pagination for questions
 $questions_per_page = 5; // Number of questions per page
-$current_page = isset($_GET['question_page']) ? (int)$_GET['question_page'] : 1;
-$offset = ($current_page - 1) * $questions_per_page;
+$current_page = isset($_GET['question_page']) ? (int)$_GET['question_page'] : 1; // Get the current page from the URL
+$offset = ($current_page - 1) * $questions_per_page; // Calculate the offset
 
 $filter_category = isset($_GET['filter_category']) ? (int)$_GET['filter_category'] : 0;
 
-$questions_query = "SELECT * FROM questions";
+// Fetch questions for the current page
+$questions_query = "SELECT question_text, question_type, option_1, option_2, option_3, option_4, correct_option FROM questions";
 if ($filter_category > 0) {
     $questions_query .= " WHERE quiz_category = $filter_category";
 }
@@ -139,6 +144,7 @@ $questions_query .= " LIMIT $questions_per_page OFFSET $offset";
 
 $questions_result = $conn->query($questions_query);
 
+// Fetch total number of questions for pagination
 $total_questions_query = "SELECT COUNT(*) AS total FROM questions";
 if ($filter_category > 0) {
     $total_questions_query .= " WHERE quiz_category = $filter_category";
@@ -146,7 +152,7 @@ if ($filter_category > 0) {
 $total_questions_result = $conn->query($total_questions_query);
 $total_questions = $total_questions_result->fetch_assoc()['total'];
 
-$total_question_pages = ceil($total_questions / $questions_per_page);
+$total_question_pages = ceil($total_questions / $questions_per_page); // Calculate total pages
 
 $conn->close();
 
@@ -160,7 +166,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
 <head>
     <!-- Meta tags and page title -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" width="device-width, initial-scale=1.0">
     <title>Quiz Dashboard</title>
     
     <!-- External resources -->
@@ -243,6 +249,12 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         </a>
                     </li>
                     <li>
+                        <a href="Quiz_page.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors">
+                            <i class="fas fa-question-circle w-5 text-center"></i>
+                            <span>Quiz Page</span>
+                        </a>
+                    </li>
+                    <li>
                         <a href="mail.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_categories ? 'active-nav' : '' ?>">
                         <i class="fas fa-envelope w-5 text-center"></i>
                             <span>Mail </span>
@@ -287,7 +299,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                     <tr class="border-b">
                                         <th class="text-left p-2">ID</th>
                                         <th class="text-left p-2">Name</th>
-                                        <th class="text-left p-2">Actions</th>
+                                        <th class="text-left p-2">Questions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -296,7 +308,10 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                         <td class="p-2"><?= $cat['id'] ?></td>
                                         <td class="p-2"><?= $cat['name'] ?></td>
                                         <td class="p-2">
-                                            <button class="text-blue-500 hover:text-blue-700">Edit</button>
+                                            <a href="Quiz_page.php?category=<?= $cat['id'] ?>" 
+                                               class="text-blue-500 hover:text-blue-700">
+                                                View Questions
+                                            </a>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -390,22 +405,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                 </select>
                             </div>
                             <div id="dynamic-input-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="correct_option[]" value="1" class="mr-2">
-                                    <input type="text" name="option_1" class="w-full p-2 border rounded" placeholder="Option 1" required>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="correct_option[]" value="2" class="mr-2">
-                                    <input type="text" name="option_2" class="w-full p-2 border rounded" placeholder="Option 2" required>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="correct_option[]" value="3" class="mr-2">
-                                    <input type="text" name="option_3" class="w-full p-2 border rounded" placeholder="Option 3" required>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="correct_option[]" value="4" class="mr-2">
-                                    <input type="text" name="option_4" class="w-full p-2 border rounded" placeholder="Option 4" required>
-                                </label>
+                                <!-- Dynamic fields will be populated here -->
                             </div>
                             <button type="submit" name="add_question" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
                                 Add Question
@@ -479,6 +479,29 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                     <?php endif; ?>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Pagination Controls -->
+                        <div class="flex justify-between items-center mt-6">
+                            <?php if ($current_page > 1): ?>
+                                <a href="dashboard.php?action=create_quiz&filter_category=<?= $filter_category ?>&question_page=<?= $current_page - 1 ?>" 
+                                   class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                                    Previous
+                                </a>
+                            <?php else: ?>
+                                <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Previous</span>
+                            <?php endif; ?>
+
+                            <span class="text-gray-700">Page <?= $current_page ?> of <?= $total_question_pages ?></span>
+
+                            <?php if ($current_page < $total_question_pages): ?>
+                                <a href="dashboard.php?action=create_quiz&filter_category=<?= $filter_category ?>&question_page=<?= $current_page + 1 ?>" 
+                                   class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                                    Next
+                                </a>
+                            <?php else: ?>
+                                <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Next</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

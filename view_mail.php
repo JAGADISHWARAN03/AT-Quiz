@@ -1,21 +1,36 @@
 <?php
-// IMAP Configuration
-$hostname = "{imap.gmail.com:993/imap/ssl}INBOX"; // Replace with your IMAP server
-$username = 'jagadishbit0@gmail.com'; // Replace with your email
-$password = 'ughe ebfb ewky gqep'; // Replace with your email password
+$hostname = "{imap.gmail.com:993/imap/ssl}INBOX";
+$username = 'jagadishbit0@gmail.com';
+$password = 'ughe ebfb ewky gqep';
 
-// Get the email ID from the query string
-$email_id = isset($_GET['email_id']) ? intval($_GET['email_id']) : 0;
+$email_id = isset($_GET['email_id']) ? (int)$_GET['email_id'] : 0;
 
-// Connect to IMAP
 $inbox = imap_open($hostname, $username, $password) or die('Cannot connect to IMAP: ' . imap_last_error());
-
-// Fetch the email content
 $overview = imap_fetch_overview($inbox, $email_id, 0);
 $message = imap_fetchbody($inbox, $email_id, 1);
 
-// Close IMAP connection
+// Extract skill from email body
+$skill = extractSkillFromBody($message); // Custom function to extract skill
+
+// Generate quiz link
+$quiz_link = generateQuizLink($skill); // Custom function to generate quiz link
+
 imap_close($inbox);
+
+function extractSkillFromBody($body) {
+    if (strpos($body, 'Python') !== false) {
+        return 'Python';
+    } elseif (strpos($body, 'JavaScript') !== false) {
+        return 'JavaScript';
+    } elseif (strpos($body, 'PHP') !== false) {
+        return 'PHP';
+    }
+    return 'General';
+}
+
+function generateQuizLink($skill) {
+    return "Quiz_page.php?category=" . urlencode($skill);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,15 +43,13 @@ imap_close($inbox);
 <body class="bg-gray-100">
     <div class="container mx-auto py-8">
         <div class="bg-white p-6 shadow-md rounded-lg">
-            <h2 class="text-2xl font-semibold mb-2 text-gray-800"><?php echo htmlspecialchars($overview[0]->subject); ?></h2>
-            <p class="text-sm text-gray-500 mb-4">From: <?php echo htmlspecialchars($overview[0]->from); ?></p>
-            <div class="text-gray-800 space-y-4">
-                <p><?php echo nl2br(htmlspecialchars($message)); ?></p>
+            <h2 class="text-2xl font-extrabold text-purple-700 mb-4"><?= htmlspecialchars($overview[0]->subject) ?></h2>
+            <p class="text-sm text-gray-500 mb-2">From: <?= htmlspecialchars($overview[0]->from) ?></p>
+            <div class="text-gray-800">
+                <p><?= nl2br(htmlspecialchars($message)) ?></p>
+                <a href="<?= $quiz_link ?>" class="text-blue-500 underline mt-4 block">Take the <?= htmlspecialchars($skill) ?> Quiz</a>
+                <button onclick="replyToEmail(<?= $email_id ?>)" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded mt-4">Reply</button>
             </div>
-            <?php
-            echo '<a href="view_mail.php?email_id=' . $email_number . '" class="text-blue-500 hover:underline">View</a>';
-            echo '<p class="text-gray-600 p-4">No application-related emails found.</p>';
-            ?>
         </div>
     </div>
 </body>
