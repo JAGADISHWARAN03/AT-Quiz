@@ -21,6 +21,31 @@ $categories_result = $conn->query($categories_query);
 // Calculate total pages
 $total_pages = ceil($total_categories / $categories_per_page);
 
+// Fetch total number of registered users
+$total_users_query = "SELECT COUNT(*) AS total_users FROM users";
+$total_users_result = $conn->query($total_users_query);
+$total_users = $total_users_result->fetch_assoc()['total_users'];
+
+// Fetch performance data for quiz categories
+$category_performance_query = "
+    SELECT 
+        qc.name AS category_name, 
+        COUNT(qr.id) AS attempts 
+    FROM quiz_results qr
+    JOIN quiz_categories qc ON qr.category_id = qc.id
+    GROUP BY qc.id
+    ORDER BY qc.name
+";
+$category_performance_result = $conn->query($category_performance_query);
+
+// Prepare data for the chart
+$categories = [];
+$attempts = [];
+while ($row = $category_performance_result->fetch_assoc()) {
+    $categories[] = $row['category_name'];
+    $attempts[] = $row['attempts'];
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Process Add Category form submission
@@ -171,33 +196,199 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
     
     <!-- External resources -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <!-- Inline styles for dynamic elements -->
     <style>
         .active-nav {
-            background-color: #4f46e5;
-            font-weight: 600;
+            background-color: #4f46e5; /* Indigo color for active tab */
+            font-weight: 600; /* Bold font for active tab */
         }
         .quiz-form {
             display: <?= $show_quiz_form ? 'block' : 'none' ?>;
         }
+
+        /* General styles */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden; /* Prevent scrolling on the entire page */
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header styles */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        /* Sidebar styles */
+        aside {
+            position: fixed;
+            top: 60px; /* Below the header */
+            left: 0;
+            width: 16rem; /* Fixed width for the sidebar */
+            height: calc(100% - 120px); /* Full height minus header and footer */
+            background-color: #1e3a8a; /* Sidebar background color */
+            color: white;
+            overflow-y: auto; /* Enable scrolling for the sidebar if content overflows */
+            z-index: 1000;
+        }
+
+        /* Footer styles */
+        footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #1e3a8a;
+            color: white;
+            text-align: center;
+            line-height: 60px; /* Vertically center the text */
+            z-index: 1000;
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-top: 60px; /* Below the header */
+            margin-left: 16rem; /* To the right of the sidebar */
+            margin-bottom: 60px; /* Above the footer */
+            padding: 1rem;
+            width: calc(100% - 16rem); /* Full width minus the sidebar width */
+            height: calc(100% - 120px); /* Full height minus header and footer */
+            overflow-y: auto; /* Enable scrolling for the main content */
+            background-color: #f9fafb; /* Light background for better contrast */
+            box-sizing: border-box; /* Include padding in height calculation */
+            
+            
+            justify-content: flex-start; /* Align content to the top */
+            align-items: stretch; /* Stretch content to fill the width */
+        }
     </style>
+    <script>
+        // Function to dynamically load mail.php content
+        function loadMailContent() {
+            fetch('mail.php')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('dynamic-content').innerHTML = data;
+                })
+                .catch(error => {
+                    console.error('Error loading mail content:', error);
+                    document.getElementById('dynamic-content').innerHTML = '<p class="text-red-500">Failed to load mail content.</p>';
+                });
+        }
+
+        // Event listener for the "Mail" link
+        document.addEventListener('DOMContentLoaded', () => {
+            const mailLink = document.querySelector('[href="mail.php"]');
+            mailLink.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent default link behavior
+                loadMailContent(); // Load mail content dynamically
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const mailLink = document.querySelector('[href*="action=mail"]');
+            const dashboardOverview = document.getElementById('dashboard-overview');
+            const quizCreation = document.getElementById('quiz-creation');
+            const resultsSection = document.getElementById('results-section');
+            const categoriesSection = document.getElementById('categories-section');
+            const mailSection = document.getElementById('mail-section');
+
+            // Event listener for "Mail" link
+            mailLink.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent default link behavior
+
+                // Hide other sections
+                dashboardOverview.classList.add('hidden');
+                quizCreation.classList.add('hidden');
+                resultsSection.classList.add('hidden');
+                categoriesSection.classList.add('hidden');
+
+                // Show the mail section
+                mailSection.classList.remove('hidden');
+            });
+        });
+
+        // Function to load email content dynamically
+        function loadEmailContent(emailId) {
+            fetch(`view_mail.php?email_id=${emailId}`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('email-viewer').innerHTML = data;
+                })
+                .catch(error => {
+                    document.getElementById('email-viewer').innerHTML = '<p class="text-red-500">Failed to load content.</p>';
+                });
+        }
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const ctx = document.getElementById('quizChart').getContext('2d');
+            const quizChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: <?= json_encode($categories) ?>, // Dynamic quiz categories
+                    datasets: [{
+                        label: 'Number of Attempts',
+                        data: <?= json_encode($attempts) ?>, // Dynamic performance data
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(54, 162, 235, 0.2)',
+                            'rgba(255, 206, 86, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 99, 132, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 </head>
 <body class="bg-gray-50">
     <!-- Page header with logo and contact info -->
-    <header class="p-4 flex-col bg-white shadow-md">
-        <div class="flex items-center justify-between space-x-4 max-w-[80%] mx-auto">
-            <div class="flex items-start space-x-4">
+    <header class="p-4 bg-white shadow-md">
+        <div class="flex flex-col md:flex-row  justify-between space-y-4 md:space-y-0 max-w-[90%] mx-auto">
+            <div class="flex items-center space-x-4">
                 <img src="assets\Arrow Thought (1) 1 (1).png" alt="Logo" class="h-10">
             </div>
-            <div class="flex items-end justify-end space-x-2 text-blue-900">
+            <div class="flex items-center space-x-4 text-blue-900">
                 <div class="bg-gradient-to-r from-blue-500 to-blue-700 p-2 rounded-full">
                     <svg fill="#000000" height="24px" width="24px" viewBox="0 0 473.806 473.806">
                         <!-- Phone icon SVG -->
                     </svg>
                 </div>
-                <div class="text-sm">
+                <div class="text-center md:text-left text-sm">
                     <span class="block font-bold">Call any time</span>
                     <span>+1 916 284 9204</span>
                 </div>
@@ -223,41 +414,39 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 </div>
                 <ul class="space-y-1">
                     <li>
-                        <a href="dashboard.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= !$show_quiz_form ? 'active-nav' : '' ?>">
+                        <a href="dashboard.php" 
+                           class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= !isset($_GET['action']) ? 'active-nav' : '' ?>">
                             <i class="fas fa-tachometer-alt w-5 text-center"></i>
                             <span>Dashboard</span>
                         </a>
                     </li>
                     <li class="mt-6 mb-2 text-xs font-semibold text-indigo-300 uppercase tracking-wider">Quick Actions</li>
                     <li>
-                        <a href="dashboard.php?action=create_quiz" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_quiz_form ? 'active-nav' : '' ?>">
+                        <a href="dashboard.php?action=create_quiz" 
+                           class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= isset($_GET['action']) && $_GET['action'] === 'create_quiz' ? 'active-nav' : '' ?>">
                             <i class="fas fa-plus-circle w-5 text-center"></i>
                             <span>Create Quiz</span>
                         </a>
                     </li>
-                    
                     <li>
-                        <a href="dashboard.php?action=results" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_results ? 'active-nav' : '' ?>">
+                        <a href="dashboard.php?action=results" 
+                           class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= isset($_GET['action']) && $_GET['action'] === 'results' ? 'active-nav' : '' ?>">
                             <i class="fas fa-chart-bar w-5 text-center"></i>
                             <span>Results</span>
                         </a>
                     </li>
                     <li>
-                        <a href="dashboard.php?action=categories" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_categories ? 'active-nav' : '' ?>">
+                        <a href="dashboard.php?action=categories" 
+                           class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= isset($_GET['action']) && $_GET['action'] === 'categories' ? 'active-nav' : '' ?>">
                             <i class="fas fa-list w-5 text-center"></i>
                             <span>Quiz Categories</span>
                         </a>
                     </li>
                     <li>
-                        <a href="Quiz_page.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors">
-                            <i class="fas fa-question-circle w-5 text-center"></i>
-                            <span>Quiz Page</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="mail.php" class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= $show_categories ? 'active-nav' : '' ?>">
-                        <i class="fas fa-envelope w-5 text-center"></i>
-                            <span>Mail </span>
+                        <a href="dashboard.php?action=mail" 
+                           class="flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-700 transition-colors <?= isset($_GET['action']) && $_GET['action'] === 'mail' ? 'active-nav' : '' ?>">
+                            <i class="fas fa-envelope w-5 text-center"></i>
+                            <span>Mail</span>
                         </a>
                     </li>
                 </ul>
@@ -265,7 +454,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
         </aside>
 
         <!-- Main content area that changes based on navigation -->
-        <div class="flex-1 overflow-x-hidden overflow-y-auto p-6">
+        <div class="main-content">
             <div class="max-w-[80%] mx-auto">
                 <!-- Display session messages if any -->
                 <?php if (isset($_SESSION['message'])): ?>
@@ -274,50 +463,47 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                     </div>
                 <?php endif; ?>
 
-                <!-- Dashboard Overview Section (default view) -->
-                <div id="dashboard-overview" class="<?= $show_categories || $show_quiz_form || $show_results ? 'hidden' : 'block' ?>">
-                    <h1 class="text-3xl font-bold mb-6">Dashboard Overview gjg</h1>
+                <!-- Dashboard Overview Section -->
+                <div id="dashboard-overview" class="<?= $show_categories || $show_quiz_form || $show_results || (isset($_GET['action']) && $_GET['action'] === 'mail') ? 'hidden' : 'block' ?>">
+                    <h1 class="text-4xl font-bold mb-6 text-center text-indigo-700">Welcome to the Quiz Management Dashboard</h1>
                     
-                    <!-- Stats cards showing totals -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="font-semibold text-lg mb-2">Total Categories</h3>
-                            <p class="text-3xl font-bold text-indigo-600"><?= count($categories) ?></p>
-                        </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="font-semibold text-lg mb-2">Total Quizzes</h3>
-                            <p class="text-3xl font-bold text-indigo-600"><?= count($quizzes) ?></p>
+                    <!-- Total Users Card -->
+                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 text-white p-6 rounded-lg shadow mb-6">
+                        <div class="flex items-center space-x-4">
+                            <i class="fas fa-users text-4xl"></i>
+                            <div>
+                                <h3 class="font-semibold text-lg">Total Registered Users</h3>
+                                <p class="text-3xl font-bold"><?= $total_users ?></p>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Recent Categories table -->
-                    <div class="bg-white shadow-lg p-6 rounded-lg mb-6">
-                        <h2 class="text-2xl font-bold mb-4">Recent Categories</h2>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full">
-                                <thead>
-                                    <tr class="border-b">
-                                        <th class="text-left p-2">ID</th>
-                                        <th class="text-left p-2">Name</th>
-                                        <th class="text-left p-2">Questions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach (array_slice($categories, 0, 5) as $cat): ?>
-                                    <tr class="border-b">
-                                        <td class="p-2"><?= $cat['id'] ?></td>
-                                        <td class="p-2"><?= $cat['name'] ?></td>
-                                        <td class="p-2">
-                                            <a href="Quiz_page.php?category=<?= $cat['id'] ?>" 
-                                               class="text-blue-500 hover:text-blue-700">
-                                                View Questions
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+
+                    <!-- Stats cards showing totals -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+                            <div class="flex items-center space-x-4">
+                                <i class="fas fa-list text-4xl"></i>
+                                <div>
+                                    <h3 class="font-semibold text-lg">Total Categories</h3>
+                                    <p class="text-3xl font-bold"><?= count($categories) ?></p>
+                                </div>
+                            </div>
                         </div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+                            <div class="flex items-center space-x-4">
+                                <i class="fas fa-book text-4xl"></i>
+                                <div>
+                                    <h3 class="font-semibold text-lg">Total Quizzes</h3>
+                                    <p class="text-3xl font-bold"><?= count($quizzes) ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart Section -->
+                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <h2 class="text-2xl font-bold mb-4">Quiz Categories Performance</h2>
+                        <canvas id="quizChart" class="w-full h-64"></canvas>
                     </div>
                 </div>
 
@@ -508,34 +694,17 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
 
                 <!-- Results Section (shown when Results is clicked) -->
                 <div id="results-section" class="<?= $show_results ? 'block' : 'hidden' ?>">
-                    <h1 class="text-3xl font-bold text-center mb-6">Quiz Results</h1>
+                    
 
                     <!-- Results table showing user performance -->
                     <div class="bg-white shadow-lg p-6 rounded-lg">
-                        <table class="min-w-full border">
-                            <thead>
-                                <tr class="border-b">
-                                    <th class="text-left p-2">User ID</th>
-                                    <th class="text-left p-2">User Email</th>
-                                    <th class="text-left p-2">Category</th>
-                                    <th class="text-left p-2">Total Score</th>
-                                    <th class="text-left p-2">Total Questions</th>
-                                    <th class="text-left p-2">Attempts</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($row = $result->fetch_assoc()): ?>
-                                    <tr class="border-b">
-                                        <td class="p-2"><?= $row['user_id'] ?></td>
-                                        <td class="p-2"><?= htmlspecialchars($row['user_email']) ?></td>
-                                        <td class="p-2"><?= htmlspecialchars($row['category_name']) ?></td>
-                                        <td class="p-2"><?= $row['total_score'] ?></td>
-                                        <td class="p-2"><?= $row['total_questions'] ?></td>
-                                        <td class="p-2"><?= $row['attempts'] ?></td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
+                    <h1 class="text-3xl font-bold text-center mb-6">Quiz Results</h1>
+
+<!-- Filter Section -->
+<?php include 'filter_section.php'; ?>
+
+<!-- Results Table -->
+<?php include 'results_table.php'; ?>
                     </div>
                 </div>
 
@@ -587,6 +756,50 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         <?php endif; ?>
                     </div>
                 </div>
+
+                <!-- Mail Center Section (shown when Mail is clicked) -->
+                <div id="mail-section" class="<?= isset($_GET['action']) && $_GET['action'] === 'mail' ? 'block' : 'hidden' ?>">
+                <div class="flex flex-col p-6 md:p-10 space-y-6">
+  <h1 class="text-3xl font-bold text-gray-700">📨 Mail Center</h1>
+
+  <!-- Panels -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Mail List -->
+     <div class="col-span-1 bg-white rounded-lg shadow p-4 overflow-y-auto max-h-[600px]">
+      <h2 class="text-lg font-semibold mb-4 text-indigo-600">Inbox</h2>
+      <?php
+      $hostname = "{imap.gmail.com:993/imap/ssl}INBOX";
+      $username = 'jagadishbit0@gmail.com';
+      $password = 'ughe ebfb ewky gqep';
+
+      $inbox = imap_open($hostname, $username, $password) or die('Cannot connect to IMAP: ' . imap_last_error());
+      $emails = imap_search($inbox, 'SUBJECT "New User Registration"');
+
+      if ($emails) {
+          rsort($emails);
+          foreach ($emails as $email_number) {
+              $overview = imap_fetch_overview($inbox, $email_number, 0);
+              echo '<div class="border border-gray-200 rounded-lg p-3 hover:bg-indigo-50 cursor-pointer mb-2" onclick="loadEmailContent(' . $email_number . ')">';
+              echo '<h4 class="font-medium truncate">' . htmlspecialchars($overview[0]->from) . '</h4>';
+              echo '<p class="text-sm text-gray-500 truncate">' . htmlspecialchars($overview[0]->subject) . '</p>';
+              echo '</div>';
+          }
+      } else {
+          echo '<p class="text-gray-500">No emails found.</p>';
+      }
+      imap_close($inbox);
+      ?>
+    </div> 
+
+    <!-- Email Viewer -->
+    <div id="email-viewer" class="col-span-2 bg-white rounded-lg shadow p-6 overflow-y-auto max-h-[600px]">
+      <h2 class="text-lg font-semibold text-indigo-600 mb-4">Open Mail</h2>
+      <p class="text-gray-500">Click on a message to view its contents.</p>
+    </div>
+  </div>
+</div>
+                </div>
             </div>
         </div>
     </div>
@@ -606,10 +819,12 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
             const createQuizLink = document.querySelector('[href*="action=create_quiz"]');
             const resultsLink = document.querySelector('[href*="action=results"]');
             const categoriesLink = document.querySelector('[href*="action=categories"]');
+            const mailLink = document.querySelector('[href*="action=mail"]');
             const dashboardOverview = document.getElementById('dashboard-overview');
             const quizCreation = document.getElementById('quiz-creation');
             const resultsSection = document.getElementById('results-section');
             const categoriesSection = document.getElementById('categories-section');
+            const mailSection = document.getElementById('mail-section');
 
             // Event listener for "Create Quiz" link
             createQuizLink.addEventListener('click', (e) => {
@@ -619,6 +834,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 dashboardOverview.classList.add('hidden');
                 resultsSection.classList.add('hidden');
                 categoriesSection.classList.add('hidden');
+                mailSection.classList.add('hidden');
 
                 // Show the quiz creation section
                 quizCreation.classList.remove('hidden');
@@ -632,6 +848,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 dashboardOverview.classList.add('hidden');
                 quizCreation.classList.add('hidden');
                 categoriesSection.classList.add('hidden');
+                mailSection.classList.add('hidden');
 
                 // Show the results section
                 resultsSection.classList.remove('hidden');
@@ -645,9 +862,24 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 dashboardOverview.classList.add('hidden');
                 quizCreation.classList.add('hidden');
                 resultsSection.classList.add('hidden');
+                mailSection.classList.add('hidden');
 
                 // Show the categories section
                 categoriesSection.classList.remove('hidden');
+            });
+
+            // Event listener for "Mail" link
+            mailLink.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent default link behavior
+
+                // Hide other sections
+                dashboardOverview.classList.add('hidden');
+                quizCreation.classList.add('hidden');
+                resultsSection.classList.add('hidden');
+                categoriesSection.classList.add('hidden');
+
+                // Show the mail section
+                mailSection.classList.remove('hidden');
             });
         });
 
@@ -715,6 +947,32 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
 
         // Initialize the input fields on page load
         document.addEventListener('DOMContentLoaded', updateInputFields);
+
+        function loadEmailContent(emailId) {
+            fetch(`view_mail.php?email_id=${emailId}`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('email-viewer').innerHTML = data;
+                })
+                .catch(error => {
+                    document.getElementById('email-viewer').innerHTML = '<p class="text-red-500">Failed to load content.</p>';
+                });
+        }
+
+        function replyToEmail(emailId) {
+            fetch(`reply_mail.php?email_id=${emailId}`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('email-viewer').innerHTML = data;
+                })
+                .catch(error => {
+                    document.getElementById('email-viewer').innerHTML = '<p class="text-red-500">Failed to load reply form.</p>';
+                });
+        }
     </script>
+ 
 </body>
+<footer class="mt-0 bg-blue-900 text-white text-center p-4">
+        &copy; 2025 Quiz Management System
+    </footer>
 </html>

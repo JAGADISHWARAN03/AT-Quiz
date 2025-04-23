@@ -32,7 +32,7 @@ $skill = extractSkillFromBody($message);
 $category_id = matchSkillToCategory($skill, $conn);
 
 // Generate quiz link
-$quiz_link = generateQuizLink($category_id);
+$quiz_link = generateQuizLink($category_id, $user_email, $conn);
 
 imap_close($inbox);
 
@@ -73,9 +73,18 @@ function matchSkillToCategory($skill, $conn) {
     return $category ? $category['id'] : 0;
 }
 
-function generateQuizLink($category_id) {
-    // Generate the quiz link with the category ID
-    return "Quiz_page.php?category=" . urlencode($category_id);
+function generateQuizLink($category_id, $user_email, $conn) {
+    // Generate a unique token
+    $token = bin2hex(random_bytes(16));
+
+    // Store the token in the database
+    $stmt = $conn->prepare("INSERT INTO quiz_links (email, category_id, token) VALUES (?, ?, ?)");
+    $stmt->bind_param("sis", $user_email, $category_id, $token);
+    $stmt->execute();
+    $stmt->close();
+
+    // Return the quiz link with the token
+    return "Quiz_page.php?category=" . urlencode($category_id) . "&token=" . urlencode($token);
 }
 
 function sendReplyEmail($recipient_email, $quiz_link) {
