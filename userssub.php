@@ -51,7 +51,14 @@
                 <!-- Skill -->
                 <div>
                     <label for="skill" class="block text-sm font-medium text-gray-700 mb-1">Skill</label>
-                    <input type="text" id="skill" name="skill" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter your skill" required>
+                    <select id="skill" name="skill" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <option value="" disabled selected>Select your skill</option>
+                        <option value="Dotnet">Dotnet</option>
+                        <option value="Java">Java</option>
+                        <option value="Angular">Angular</option>
+                        <option value="Python">Python</option>
+                        <option value="Reactjs">Reactjs</option>
+                    </select>
                 </div>
                 <!-- Submit Button -->
                 <div class="text-center">

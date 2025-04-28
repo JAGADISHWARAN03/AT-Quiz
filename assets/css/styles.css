@@ -150,3 +150,7 @@ button.bg-green-500 {
 button:hover {
     opacity: 0.9;
 }
+
+/* dashboard.php?action=results */
+/* type="submit" id="submit-button" */
+/* $skill = extractSkillFromBody($message); */

@@ -86,7 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Process Add Question form submission
     if (isset($_POST['add_question'])) {
-        $quiz_category = (int)$_POST['quiz_category'];
+        $quiz_category = (int)$_POST['quiz_category']; // Get the selected quiz category
+        $quiz_title = (int)$_POST['quiz_title']; // Get the selected quiz title
         $question_text = $conn->real_escape_string($_POST['question_text']);
         $question_type = $conn->real_escape_string($_POST['question_type']);
 
@@ -96,29 +97,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $option_2 = $conn->real_escape_string($_POST['option_2']);
             $option_3 = $conn->real_escape_string($_POST['option_3']);
             $option_4 = $conn->real_escape_string($_POST['option_4']);
-            
-            // Convert the array of correct options to a JSON string
             $correct_options = isset($_POST['correct_option']) ? json_encode($_POST['correct_option']) : '[]';
 
-            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssssss", $quiz_category, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_options);
+            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, quiz_title, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("iisssssss", $quiz_category, $quiz_title, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_options);
         } elseif ($question_type === 'radio') {
             // Handle radio button options
             $option_1 = $conn->real_escape_string($_POST['option_1']);
             $option_2 = $conn->real_escape_string($_POST['option_2']);
             $option_3 = $conn->real_escape_string($_POST['option_3']);
             $option_4 = $conn->real_escape_string($_POST['option_4']);
-            
-            // Get the selected correct option
             $correct_option = isset($_POST['correct_option']) ? (int)$_POST['correct_option'] : 0;
 
-            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssssii", $quiz_category, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_option);
+            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, quiz_title, question_text, question_type, option_1, option_2, option_3, option_4, correct_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("iisssssii", $quiz_category, $quiz_title, $question_text, $question_type, $option_1, $option_2, $option_3, $option_4, $correct_option);
         } elseif ($question_type === 'text') {
             // Handle text input
             $text_answer = isset($_POST['text_answer']) ? $conn->real_escape_string($_POST['text_answer']) : '';
-            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, question_text, question_type, correct_option) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("isss", $quiz_category, $question_text, $question_type, $text_answer);
+            $stmt = $conn->prepare("INSERT INTO questions (quiz_category, quiz_title, question_text, question_type, correct_option) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param("iisss", $quiz_category, $quiz_title, $question_text, $question_type, $text_answer);
         }
 
         if ($stmt->execute()) {
@@ -570,18 +567,33 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                     <div class="bg-white shadow-lg p-6 rounded-lg">
                         <h2 class="text-2xl font-bold mb-4">Add Questions</h2>
                         <form method="POST" action="dashboard.php?action=create_quiz">
+                            <!-- Select Quiz Category -->
                             <div class="mb-4">
                                 <label class="block font-medium mb-2">Select Quiz Category</label>
-                                <select name="quiz_category" class="w-full p-2 border rounded" required>
+                                <select id="quiz_category" name="quiz_category" class="w-full p-2 border rounded" required onchange="fetchQuizTitles(this.value)">
+                                    <option value="">Select a category</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+
+                            <!-- Select Quiz Title -->
+                            <div class="mb-4">
+                                <label class="block font-medium mb-2">Select Quiz Title</label>
+                                <select id="quiz_title" name="quiz_title" class="w-full p-2 border rounded" required>
+                                    <option value="">Select a quiz</option>
+                                    <!-- Quiz titles will be dynamically populated here -->
+                                </select>
+                            </div>
+
+                            <!-- Question Text -->
                             <div class="mb-4">
                                 <label class="block font-medium mb-2">Question Text</label>
                                 <textarea name="question_text" class="w-full p-2 border rounded" rows="2" required></textarea>
                             </div>
+
+                            <!-- Question Type -->
                             <div class="mb-4">
                                 <label class="block font-medium mb-2">Question Type</label>
                                 <select id="question-type" name="question_type" class="w-full p-2 border rounded" required onchange="updateInputFields()">
@@ -590,9 +602,13 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                     <option value="text">Input Text</option>
                                 </select>
                             </div>
+
+                            <!-- Dynamic Input Fields -->
                             <div id="dynamic-input-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <!-- Dynamic fields will be populated here -->
                             </div>
+
+                            <!-- Submit Button -->
                             <button type="submit" name="add_question" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
                                 Add Question
                             </button>
@@ -716,10 +732,12 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             <div class="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between">
                                 <h3 class="text-xl font-semibold mb-2"><?= htmlspecialchars($row['name']) ?></h3>
                                 <div class="flex justify-between items-center">
-                                    <a href="quiz_display.php?category_id=<?= $row['id'] ?>" 
-                                       class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                    <a href="javascript:void(0);" 
+                                       class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" 
+                                       onclick="loadQuizzes(<?= $row['id'] ?>)">
                                         View Quizzes
                                     </a>
+                                    
                                     <label class="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" class="sr-only peer" 
                                                onchange="toggleCategory(<?= $row['id'] ?>)" 
@@ -756,7 +774,15 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         <?php endif; ?>
                     </div>
                 </div>
-
+                <div id="quiz-display-section" class="hidden">
+                    <button onclick="goBackToCategories()" class="bg-gray-500 text-white px-4 py-2 rounded mb-4">
+                        Back to Categories
+                    </button>
+                    <div id="quiz-display-content"></div>
+                </div>
+                <div id="questions-containern" class="hidden">
+                    
+                </div>
                 <!-- Mail Center Section (shown when Mail is clicked) -->
                 <div id="mail-section" class="<?= isset($_GET['action']) && $_GET['action'] === 'mail' ? 'block' : 'hidden' ?>">
                 <div class="flex flex-col p-6 md:p-10 space-y-6">
@@ -806,6 +832,61 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
     
     <!-- JavaScript for dynamic functionality -->
     <script>
+
+
+function loadQuizzes(categoryId) {
+    const quizDisplaySection = document.getElementById('quiz-display-section');
+    const quizDisplayContent = document.getElementById('quiz-display-content');
+    // quizDisplayContent.innerHTML = '<p class="text-center text-gray-500">Loading quizzes...</p>'; // Show loading message
+
+    if (categoryId) {
+        fetch(`quiz_display.php?category_id=${categoryId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                quizDisplayContent.innerHTML = data; // Insert the fetched content
+                document.getElementById('categories-section').classList.add('hidden'); // Hide categories section
+                quizDisplaySection.classList.remove('hidden'); // Show quiz display section
+            })
+            .catch(error => {
+                console.error('Error loading quizzes:', error);
+                quizDisplayContent.innerHTML = '<p class="text-center text-red-500">Failed to load quizzes. Please try again.</p>';
+            });
+    } else {
+        // quizDisplayContent.innerHTML = '<p class="text-center text-red-500">Invalid category selected.</p>';
+    }
+}
+
+function loadQuizzes1(quizId) {
+        const quizDisplaySection = document.getElementById('quiz-display-section');
+        const questions_containern = document.getElementById('questions-containern');
+        if(quizId){
+            fetch(`view_questions.php?quiz_id=${quizId}`)
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('questions-containern').innerHTML = data;
+                // document.getElementById('data').classList.add('hidden'); // Hide categories section
+                quizDisplaySection.classList.add('hidden');
+                questions_containern.classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading quizzes:', error);
+            });
+        } else {
+        // quizDisplayContent.innerHTML = '<p class="text-center text-red-500">Invalid category selected.</p>';
+    }
+        
+    }
+
+function goBackToCategories() {
+    document.getElementById('categories-section').classList.remove('hidden'); // Show categories section
+    document.getElementById('quiz-display-section').classList.add('hidden'); // Hide quiz display section
+}
+
         // Toggle between dashboard and quiz creation
         document.querySelectorAll('[href*="action=create_quiz"]').forEach(link => {
             link.addEventListener('click', function(e) {
@@ -970,7 +1051,51 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 });
         }
     </script>
- 
+    <script>
+    function fetchQuizTitles(categoryId) {
+        const quizDropdown = document.getElementById('quiz_title');
+        quizDropdown.innerHTML = '<option value="">Loading...</option>'; // Show loading message
+
+        if (categoryId) {
+            fetch(`fetch_quizzes.php?category_id=${categoryId}`)
+                .then(response => response.json())
+                .then(data => {
+                    quizDropdown.innerHTML = '<option value="">Select a quiz</option>'; // Reset dropdown
+                    if (data.success) {
+                        data.quizzes.forEach(quiz => {
+                            const option = document.createElement('option');
+                            option.value = quiz.id;
+                            option.textContent = quiz.title;
+                            quizDropdown.appendChild(option);
+                        });
+                    } else {
+                        quizDropdown.innerHTML = '<option value="">No quizzes found</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching quizzes:', error);
+                    quizDropdown.innerHTML = '<option value="">Failed to load quizzes</option>';
+                });
+        } else {
+            quizDropdown.innerHTML = '<option value="">Select a quiz</option>'; // Reset if no category is selected
+        }
+    }
+//     function loadQuizzes(categoryId) {
+//     const quizDisplaySection = document.getElementById('quiz-display-section');
+//     const quizDisplayContent = document.getElementById('quiz-display-content');
+
+//     console.log('Quiz Display Section:', quizDisplaySection);
+//     console.log('Quiz Display Content:', quizDisplayContent);
+
+//     if (!quizDisplaySection || !quizDisplayContent) {
+//         console.error('Quiz display section or content container is missing in the DOM.');
+//         return;
+//     }
+// }
+</script>
+
+<!-- Container for dynamically loaded quizzes -->
+
 </body>
 <footer class="mt-0 bg-blue-900 text-white text-center p-4">
         &copy; 2025 Quiz Management System

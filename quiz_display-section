@@ -1,0 +1,11 @@
+<div id="categories-section" class="<?= $show_categories ? 'block' : 'hidden' ?>">
+    <!-- Categories content -->
+</div>
+
+<!-- Container for dynamically loaded quizzes -->
+<div id="quiz-display-section" class="hidden mt-10">
+    <button class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 mb-4" onclick="goBackToCategories()">
+        Back to Categories
+    </button>
+    <div id="quiz-display-content"></div>
+</div>

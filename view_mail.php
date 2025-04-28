@@ -39,8 +39,42 @@ function generateQuizLink($skill) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Mail</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader {
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+    <script>
+        function showLoadingSpinner() {
+            document.getElementById('loading-spinner').classList.remove('hidden');
+        }
+
+        function replyToEmail(emailId) {
+            showLoadingSpinner();
+            window.location.href = `reply_mail.php?email_id=${emailId}`;
+        }
+    </script>
 </head>
 <body class="bg-gray-100">
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="fixed inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75 hidden">
+        <div class="flex flex-col items-center">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-blue-500 h-12 w-12 mb-4"></div>
+            <p class="text-blue-700 font-semibold">Processing your request...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
     <div class="container mx-auto py-8">
         <div class="bg-white p-6 shadow-md rounded-lg">
             <h2 class="text-2xl font-extrabold text-purple-700 mb-4"><?= htmlspecialchars($overview[0]->subject) ?></h2>
