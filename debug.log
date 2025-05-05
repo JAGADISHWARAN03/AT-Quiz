@@ -1,0 +1,78 @@
+Array
+(
+    [id] => 45
+    [question_text] => what is oops
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Incoming Data: Array
+(
+    [id] => 45
+    [question_text] => what is o
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Sanitized Data: Array
+(
+    [id] => 45
+    [question_text] => what is o
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Incoming Data: Array
+(
+    [id] => 45
+    [question_text] => what is o
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Sanitized Data: Array
+(
+    [id] => 45
+    [question_text] => what is o
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Incoming Data: Invalid Input: 
+Incoming Data: Array
+(
+    [id] => 45
+    [question_text] => what is oops
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)
+Sanitized Data: Array
+(
+    [id] => 45
+    [question_text] => what is oops
+    [question_type] => radio
+    [option_1] => opps
+    [option_2] => o
+    [option_3] => dd
+    [option_4] => oop
+    [correct_option] => 3
+)

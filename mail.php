@@ -42,8 +42,8 @@
       <h2 class="text-lg font-semibold mb-4 text-indigo-600">Inbox</h2>
       <?php
       $hostname = "{imap.gmail.com:993/imap/ssl}INBOX";
-      $username = 'jagadishbit0@gmail.com';
-      $password = 'ughe ebfb ewky gqep';
+      $username = 'jagadish027609@gmail.com';
+      $password = 'xkfy uscx cnyk ncvu';
 
       $inbox = imap_open($hostname, $username, $password) or die('Cannot connect to IMAP: ' . imap_last_error());
       $emails = imap_search($inbox, 'SUBJECT "New User Registration"');

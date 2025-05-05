@@ -17,13 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mail->isSMTP();
         $mail->Host = 'smtp.gmail.com'; // Use Gmail's SMTP server
         $mail->SMTPAuth = true;
-        $mail->Username = 'jagadishbit0@gmail.com'; // Your Gmail address
-        $mail->Password = 'ughe ebfb ewky gqep'; // Your Gmail app password
+        $mail->Username = 'jagadish027609@gmail.com'; // Your Gmail address
+        $mail->Password = 'xkfy uscx cnyk ncvu'; // Your Gmail app password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = 587;
 
         // Email details
-        $mail->setFrom('jagadishbit0@gmail.com', 'Arrow Thought'); 
+        $mail->setFrom('jagadish027609@gmail.com', 'Arrow Thought'); 
         $mail->addAddress('recipient@example.com'); 
         $mail->Subject = 'Reply to your email';
         $mail->Body = $reply_message;

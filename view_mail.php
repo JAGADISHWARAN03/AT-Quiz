@@ -12,8 +12,40 @@ $message = imap_fetchbody($inbox, $email_id, 1);
 // Extract skill from email body
 $skill = extractSkillFromBody($message); // Custom function to extract skill
 
-// Generate quiz link
-$quiz_link = generateQuizLink($skill); // Custom function to generate quiz link
+// Fetch quiz titles based on the category (skill)
+$quiz_titles = [];
+$conn = new mysqli('localhost', 'root', '', 'quiz_system'); // Update with your database credentials
+
+if ($conn->connect_error) {
+    die('Database connection failed: ' . $conn->connect_error);
+}
+
+$stmt = $conn->prepare("
+    SELECT quizzes.*
+    FROM quizzes
+    INNER JOIN quiz_categories ON quizzes.category_id = quiz_categories.id
+    WHERE quiz_categories.name = ?
+");
+
+$stmt->bind_param("s", $skill);
+$stmt->execute();
+$result = $stmt->get_result();
+
+$quiz_titles = []; // Initialize the array
+
+while ($row = $result->fetch_assoc()) {
+    $quiz_titles[] = $row;
+}
+
+// Output nicely
+// echo '<pre>';
+// print_r($quiz_titles);
+// echo '</pre>';
+// exit;
+
+$stmt->close();
+$conn->close();
+
 
 imap_close($inbox);
 
@@ -25,11 +57,15 @@ function extractSkillFromBody($body) {
     } elseif (strpos($body, 'PHP') !== false) {
         return 'PHP';
     }
-    return 'General';
-}
+    elseif (strpos($body, 'DotNet') !== false) {
+        return 'Dotnet';
+    } elseif (strpos($body, 'Java') !== false) {
+        return 'Java';
+    } elseif (strpos($body, 'ReactJS') !== false) {
+        return 'ReactJS';
+    }
 
-function generateQuizLink($skill) {
-    return "Quiz_page.php?category=" . urlencode($skill);
+    return 'General';
 }
 ?>
 <!DOCTYPE html>
@@ -38,22 +74,9 @@ function generateQuizLink($skill) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Mail</title>
+    <link rel="stylesheet" href="assets/styles.css"> 
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .loader {
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
+  
     <script>
         function showLoadingSpinner() {
             document.getElementById('loading-spinner').classList.remove('hidden');
@@ -62,6 +85,16 @@ function generateQuizLink($skill) {
         function replyToEmail(emailId) {
             showLoadingSpinner();
             window.location.href = `reply_mail.php?email_id=${emailId}`;
+        }
+
+        function takeQuiz() {
+            const quizId = document.getElementById('quiz-title').value;
+
+            if (quizId) {
+                window.location.href = `Quiz_page.php?quiz_id=${quizId}`;
+            } else {
+                alert('Please select a quiz title.');
+            }
         }
     </script>
 </head>
@@ -74,14 +107,32 @@ function generateQuizLink($skill) {
         </div>
     </div>
 
+    <!-- Response Message -->
+    <div id="response-message" class="hidden text-center p-4 rounded-lg"></div>
+
     <!-- Main Content -->
+
     <div class="container mx-auto py-8">
         <div class="bg-white p-6 shadow-md rounded-lg">
             <h2 class="text-2xl font-extrabold text-purple-700 mb-4"><?= htmlspecialchars($overview[0]->subject) ?></h2>
             <p class="text-sm text-gray-500 mb-2">From: <?= htmlspecialchars($overview[0]->from) ?></p>
             <div class="text-gray-800">
                 <p><?= nl2br(htmlspecialchars($message)) ?></p>
-                <a href="<?= $quiz_link ?>" class="text-blue-500 underline mt-4 block">Take the <?= htmlspecialchars($skill) ?> Quiz</a>
+
+                <!-- Dropdown for Quiz Titles -->
+                <label for="quiz-title" class="block text-gray-700 font-semibold mt-4">Select a Quiz Title:</label>
+                <select id="quiz-title" class="w-full p-2 border rounded mt-2">
+                    <?php if (!empty($quiz_titles)): ?>
+                        <?php foreach ($quiz_titles as $quiz): ?>
+                            <option value="<?= htmlspecialchars($quiz['id']) ?>"><?= htmlspecialchars($quiz['title']) ?></option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <option value="">No quizzes available for this category</option>
+                    <?php endif; ?>
+                </select>
+
+                <!-- Take Quiz Button -->
+                <button onclick="takeQuiz()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-4">Take Quiz</button>
                 <button onclick="replyToEmail(<?= $email_id ?>)" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded mt-4">Reply</button>
             </div>
         </div>

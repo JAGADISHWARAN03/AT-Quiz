@@ -1,26 +1,19 @@
 <?php
 require 'includes/config.php';
 
-// Get category_id and token from the URL
-$category_id = isset($_GET['category']) ? (int)$_GET['category'] : 0;
-$token = isset($_GET['token']) ? $_GET['token'] : '';
+session_start();
 
-// Validate the token and fetch the email
-$stmt = $conn->prepare("SELECT email FROM quiz_links WHERE category_id = ? AND token = ?");
-$stmt->bind_param("is", $category_id, $token);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result->num_rows === 0) {
-    die("Invalid or expired quiz link.");
+// Check if quiz_title_id is provided in the URL
+if (!isset($_GET['quiz_title_id']) || !isset($_SESSION['user_name'])) {
+    header("Location: user_form.php?quiz_title_id=" . $_GET['quiz_title_id']);
+    exit;
 }
 
-$user = $result->fetch_assoc();
-$user_email = $user['email'];
+$quiz_title_id = (int)$_GET['quiz_title_id'];
 
-// Fetch questions for the quiz
-$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4, correct_option FROM questions WHERE quiz_category = ?");
-$stmt->bind_param("i", $category_id);
+// Fetch questions for the quiz based on quiz_title_id
+$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4 FROM questions WHERE quiz_title_id = ?");
+$stmt->bind_param("i", $quiz_title_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -36,8 +29,13 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aptitude Quiz</title>
+    <title>Quiz Questions</title>
     <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white">
+    <!-- Header -->
+    
+
     <script>
         let currentQuestionIndex = 0;
         const questions = <?= json_encode($questions) ?>;

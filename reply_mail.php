@@ -95,13 +95,13 @@ function sendReplyEmail($recipient_email, $quiz_link) {
         $mail->isSMTP();
         $mail->Host = 'smtp.gmail.com';
         $mail->SMTPAuth = true;
-        $mail->Username = 'jagadishbit0@gmail.com'; // Replace with your email
-        $mail->Password = 'ughe ebfb ewky gqep'; // Replace with your email password
+        $mail->Username = 'jagadish027609@gmail.com'; // Replace with your email
+        $mail->Password = 'xkfy uscx cnyk ncvu'; // Replace with your email password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = 587;
 
         // Email details
-        $mail->setFrom('jagadishbit0@gmail.com', 'Quiz Application'); // Replace with your email and name
+        $mail->setFrom('jagadish027609@gmail.com', 'Quiz Application'); // Replace with your email and name
         $mail->addAddress($recipient_email);
         $mail->Subject = 'Your Quiz Link';
         $mail->Body = "Hello,\n\nBased on your skill, we have generated a quiz for you. Click the link below to start the quiz:\n\n$quiz_link\n\nGood luck!";
@@ -112,4 +112,7 @@ function sendReplyEmail($recipient_email, $quiz_link) {
         echo "Failed to send reply. Error: {$mail->ErrorInfo}";
     }
 }
+
+
+
 ?>

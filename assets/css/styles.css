@@ -154,3 +154,17 @@ button:hover {
 /* dashboard.php?action=results */
 /* type="submit" id="submit-button" */
 /* $skill = extractSkillFromBody($message); */
+
+.loader {
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
