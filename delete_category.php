@@ -1,25 +1,25 @@
 <?php
-include 'includes/config.php'; // Database connection
+require 'includes/config.php';
 
-// Check if the request method is DELETE
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['_method']) && $_POST['_method'] === 'DELETE') {
-    // Get the category ID from POST data
-    $categoryId = $_POST['id'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-    if ($categoryId) {
-        // Prepare the DELETE query
+    if ($id > 0) {
         $stmt = $conn->prepare("DELETE FROM quiz_categories WHERE id = ?");
-        $stmt->bind_param("i", $categoryId);
+        $stmt->bind_param("i", $id);
 
         if ($stmt->execute()) {
             echo json_encode(['success' => true]);
         } else {
-            echo json_encode(['success' => false, 'error' => $stmt->error]);
+            echo json_encode(['success' => false, 'message' => 'Failed to delete category.']);
         }
+
         $stmt->close();
     } else {
-        echo json_encode(['success' => false, 'error' => 'Invalid category ID']);
+        echo json_encode(['success' => false, 'message' => 'Invalid category ID.']);
     }
+} else {
+    echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
 ?>
 

@@ -12,7 +12,7 @@ if (!isset($_GET['quiz_title_id']) || !isset($_SESSION['user_name'])) {
 $quiz_title_id = (int)$_GET['quiz_title_id'];
 
 // Fetch questions for the quiz based on quiz_title_id
-$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4 FROM questions WHERE quiz_title_id = ?");
+$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4, question_type FROM questions WHERE quiz_title_id = ?");
 $stmt->bind_param("i", $quiz_title_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -47,24 +47,41 @@ $conn->close();
             const nextButton = document.getElementById('next-button');
             const prevButton = document.getElementById('prev-button');
 
-            // Update question text and options
             const question = questions[index];
-            questionContainer.innerHTML = `
-                <div class="mt-4">
-                    <p class="font-medium">${question.question_text}</p>
-                    ${['option_1', 'option_2', 'option_3', 'option_4'].map((option, i) => `
+
+            let optionsHtml = '';
+            if (question.question_type === 'checkbox') {
+                optionsHtml = ['option_1', 'option_2', 'option_3', 'option_4']
+                    .map((option, i) => `
+                        <label class="block mt-2">
+                            <input type="checkbox" name="answers[${question.id}][]" value="${i + 1}" class="form-checkbox text-blue-600" onchange="markAnswered(${index})">
+                            ${question[option]}
+                        </label>
+                    `).join('');
+            } else if (question.question_type === 'text') {
+                optionsHtml = `
+                    <label class="block mt-2">
+                        <input type="text" name="answers[${question.id}]" class="form-input w-full border rounded-md text-gray-800" onchange="markAnswered(${index})" placeholder="Type your answer here">
+                    </label>
+                `;
+            } else { // default to radio
+                optionsHtml = ['option_1', 'option_2', 'option_3', 'option_4']
+                    .map((option, i) => `
                         <label class="block mt-2">
                             <input type="radio" name="answers[${question.id}]" value="${i + 1}" class="form-radio text-blue-600" onchange="markAnswered(${index})">
                             ${question[option]}
                         </label>
-                    `).join('')}
+                    `).join('');
+            }
+
+            questionContainer.innerHTML = `
+                <div class="mt-4">
+                    <p class="font-medium">${question.question_text}</p>
+                    ${optionsHtml}
                 </div>
             `;
 
-            // Update question number
             questionNumber.textContent = `Question ${index + 1} of ${questions.length}`;
-
-            // Show/hide navigation buttons
             prevButton.style.display = index === 0 ? 'none' : 'inline-block';
             nextButton.style.display = index === questions.length - 1 ? 'none' : 'inline-block';
             submitButton.style.display = index === questions.length - 1 ? 'inline-block' : 'none';

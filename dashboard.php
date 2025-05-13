@@ -89,100 +89,101 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Process Add Question form submission
 
-   
-   
+
+
     if (isset($_POST['add_all_questions'])) {
         $quiz_category = (int)$_POST['quiz_category'];
         $quiz_title = (int)$_POST['quiz_title'];
         $questions = $_POST['questions'];
-        
-    
+
+
         foreach ($questions as $question) {
             $question_text = $conn->real_escape_string($question['question_text']);
             $question_type = $conn->real_escape_string($question['question_type']);
-    
+
             if ($question_type === 'checkbox') {
                 $options = [];
                 $correct_keys = [];
-    
+
                 foreach ($question['options'] as $key => $opt) {
                     $options[] = $conn->real_escape_string($opt['text']);
                     if (isset($opt['correct'])) {
                         $correct_keys[] = $key;
                     }
                 }
-    
+
                 while (count($options) < 4) $options[] = '';
-    
+
                 $correct_json = json_encode($correct_keys);
-    
+
                 $stmt = $conn->prepare("INSERT INTO questions (
                     quiz_category, quiz_title_id, question_text, question_type, 
                     option_1, option_2, option_3, option_4, correct_option
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    
-                $stmt->bind_param("iisssssss", 
-                    $quiz_category, 
-                    $quiz_title, 
-                    $question_text, 
-                    $question_type, 
-                    $options[0], 
-                    $options[1], 
-                    $options[2], 
-                    $options[3], 
+
+                $stmt->bind_param(
+                    "iisssssss",
+                    $quiz_category,
+                    $quiz_title,
+                    $question_text,
+                    $question_type,
+                    $options[0],
+                    $options[1],
+                    $options[2],
+                    $options[3],
                     $correct_json
                 );
-    
             } elseif ($question_type === 'radio') {
                 $options = [];
                 for ($i = 1; $i <= 4; $i++) {
                     $optKey = $i;
                     $options[] = isset($question['options'][$optKey]['text']) ? $conn->real_escape_string($question['options'][$optKey]['text']) : '';
                 }
-                
+
 
                 $correct_option = isset($question['correct_option']) ? (int)$question['correct_option'] : 0;
-    
+
                 $stmt = $conn->prepare("INSERT INTO questions (
                     quiz_category, quiz_title_id, question_text, question_type, 
                     option_1, option_2, option_3, option_4, correct_option
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    
-                $stmt->bind_param("iissssssi", 
-                    $quiz_category, 
-                    $quiz_title, 
-                    $question_text, 
-                    $question_type, 
-                    $options[0], 
-                    $options[1], 
-                    $options[2], 
-                    $options[3], 
+
+                $stmt->bind_param(
+                    "iissssssi",
+                    $quiz_category,
+                    $quiz_title,
+                    $question_text,
+                    $question_type,
+                    $options[0],
+                    $options[1],
+                    $options[2],
+                    $options[3],
                     $correct_option
                 );
-    
             } elseif ($question_type === 'text') {
                 $text_answer = isset($question['text_answer']) ? $conn->real_escape_string($question['text_answer']) : '';
-    
+
                 $stmt = $conn->prepare("INSERT INTO questions (
                     quiz_category, quiz_title_id, question_text, question_type, correct_option
                 ) VALUES (?, ?, ?, ?, ?)");
-    
-                $stmt->bind_param("iisss", 
-                    $quiz_category, 
-                    $quiz_title, 
-                    $question_text, 
-                    $question_type, 
+
+                $stmt->bind_param(
+                    "iisss",
+                    $quiz_category,
+                    $quiz_title,
+                    $question_text,
+                    $question_type,
                     $text_answer
                 );
             }
-    
+
             if (!$stmt->execute()) {
                 $_SESSION['message'] = "Error: " . $stmt->error;
             }
-    
+
             $stmt->close();
         }
-    
+
         $_SESSION['message'] = "All questions added successfully!";
         header("Location: dashboard.php?action=create_quiz");
         exit();
@@ -233,7 +234,21 @@ $total_questions_result = $conn->query($total_questions_query);
 $total_questions = $total_questions_result->fetch_assoc()['total'];
 
 $total_question_pages = ceil($total_questions / $questions_per_page); // Calculate total pages
+$quiz_count_query = "
+    SELECT qc.name AS category_name, COUNT(q.id) AS quiz_count
+    FROM quiz_categories qc
+    LEFT JOIN quizzes q ON qc.id = q.category_id
+    GROUP BY qc.id
+    ORDER BY qc.name
+";
+$quiz_count_result = $conn->query($quiz_count_query);
 
+$quiz_chart_categories = [];
+$quiz_chart_counts = [];
+while ($row = $quiz_count_result->fetch_assoc()) {
+    $quiz_chart_categories[] = $row['category_name'];
+    $quiz_chart_counts[] = (int)$row['quiz_count'];
+}
 $conn->close();
 
 // Determine which section to show based on URL parameters
@@ -414,42 +429,43 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
         }
     </script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const ctx = document.getElementById('quizChart').getContext('2d');
-            const quizChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: <?= json_encode($categories) ?>, // Dynamic quiz categories
-                    datasets: [{
-                        label: 'Number of Attempts',
-                        data: <?= json_encode($attempts) ?>, // Dynamic performance data
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.2)',
-                            'rgba(54, 162, 235, 0.2)',
-                            'rgba(255, 206, 86, 0.2)',
-                            'rgba(153, 102, 255, 0.2)',
-                            'rgba(255, 99, 132, 0.2)'
-                        ],
-                        borderColor: [
-                            'rgba(75, 192, 192, 1)',
-                            'rgba(54, 162, 235, 1)',
-                            'rgba(255, 206, 86, 1)',
-                            'rgba(153, 102, 255, 1)',
-                            'rgba(255, 99, 132, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
+       document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('quizChart').getContext('2d');
+    const quizChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: <?= json_encode($quiz_chart_categories) ?>, // Category names
+            datasets: [{
+                label: 'Number of Quizzes',
+                data: <?= json_encode($quiz_chart_counts) ?>, // Number of quizzes per category
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 99, 132, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    precision: 0
                 }
-            });
-        });
+            }
+        }
+    });
+});
     </script>
 </head>
 
@@ -460,17 +476,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
             <div class="flex items-center space-x-4">
                 <img src="assets\Arrow Thought (1) 1 (1).png" alt="Logo" class="h-10">
             </div>
-            <div class="flex items-center space-x-4 text-blue-900">
-                <div class="bg-gradient-to-r from-blue-500 to-blue-700 p-2 rounded-full">
-                    <svg fill="#000000" height="24px" width="24px" viewBox="0 0 473.806 473.806">
-                        <!-- Phone icon SVG -->
-                    </svg>
-                </div>
-                <div class="text-center md:text-left text-sm">
-                    <span class="block font-bold">Call any time</span>
-                    <span>+1 916 284 9204</span>
-                </div>
-            </div>
+
         </div>
     </header>
 
@@ -479,17 +485,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
         <!-- Sidebar navigation -->
         <aside class="w-64 bg-gradient-to-b from-indigo-900 to-indigo-800 text-white shadow-xl">
             <nav class="flex-1 p-4">
-                <div class="mb-8 mt-4">
-                    <div class="flex items-center space-x-4 p-3 rounded-lg bg-indigo-700">
-                        <div class="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center">
-                            <i class="fas fa-user text-white"></i>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium">Admin</p>
-                            <p class="text-xs text-indigo-200">Administrator</p>
-                        </div>
-                    </div>
-                </div>
+              
                 <ul class="space-y-1">
                     <li>
                         <a href="dashboard.php"
@@ -540,31 +536,36 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
         <div class="main-content">
             <div class="max-w-[80%] mx-auto">
                 <!-- Display session messages if any -->
-                <?php if (isset($_SESSION['message'])): ?>
-                    <div class="bg-green-100 text-green-800 p-4 rounded mb-4">
-                        <?= $_SESSION['message'];
-                        unset($_SESSION['message']); ?>
-                    </div>
-                <?php endif; ?>
+
 
                 <!-- Dashboard Overview Section -->
                 <div id="dashboard-overview" class="<?= $show_categories || $show_quiz_form || $show_results || (isset($_GET['action']) && $_GET['action'] === 'mail') ? 'hidden' : 'block' ?>">
                     <h1 class="text-4xl font-bold mb-6 text-center text-indigo-700">Welcome to the Quiz Management Dashboard</h1>
 
-                    <!-- Total Users Card -->
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 text-white p-6 rounded-lg shadow mb-6">
-                        <div class="flex items-center space-x-4">
-                            <i class="fas fa-users text-4xl"></i>
-                            <div>
-                                <h3 class="font-semibold text-lg">Total Registered Users</h3>
-                                <p class="text-3xl font-bold"><?= $total_users ?></p>
+                    <!-- Stats cards showing totals (including Total Users) -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- Total Users Card -->
+                        <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow h-full min-h-[150px] flex items-center cursor-pointer"
+                            onclick="loadUsersTable(1)">
+                            <div class="flex items-center space-x-4">
+                                <i class="fas fa-users text-4xl"></i>
+                                <div>
+                                    <h3 class="font-semibold text-lg">Registered Users</h3>
+                                    <p class="text-3xl font-bold"><?= $total_users ?></p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        <div id="users-table-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+                            <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 relative">
+                                <button onclick="closeUsersTable()" class="absolute top-2 right-2 text-gray-500 hover:text-red-500 text-2xl">&times;</button>
+                                <h2 class="text-2xl font-bold mb-4 text-indigo-700">Registered Users</h2>
+                                <div id="users-table-content"></div>
+                            </div>
+                        </div>
 
-                    <!-- Stats cards showing totals -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+                        <!-- Total Categories Card -->
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow h-full min-h-[150px] flex items-center cursor-pointer"
+                            onclick="loadCategoriesTable(1)">
                             <div class="flex items-center space-x-4">
                                 <i class="fas fa-list text-4xl"></i>
                                 <div>
@@ -573,7 +574,16 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-gradient-to-r from-green-500 to-green-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+                        <div id="categories-table-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+                            <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 relative">
+                                <button onclick="closeCategoriesTable()" class="absolute top-2 right-2 text-gray-500 hover:text-red-500 text-2xl">&times;</button>
+                                <h2 class="text-2xl font-bold mb-4 text-indigo-700">Quiz Categories</h2>
+                                <div id="categories-table-content"></div>
+                            </div>
+                        </div>
+
+                        <!-- Total Quizzes Card -->
+                        <div class="bg-gradient-to-r from-green-500 to-green-700 text-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow h-full min-h-[150px] flex items-center">
                             <div class="flex items-center space-x-4">
                                 <i class="fas fa-book text-4xl"></i>
                                 <div>
@@ -583,96 +593,171 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             </div>
                         </div>
                     </div>
-
                     <!-- Chart Section -->
-                    <div class="bg-white p-6 rounded-lg shadow mb-6">
-                        <h2 class="text-2xl font-bold mb-4">Quiz Categories Performance</h2>
-                        <canvas id="quizChart" class="w-full h-64"></canvas>
+                      <div class="bg-white p-6 rounded-lg shadow mb-6 col-span-1 md:col-span-3" style="min-height: 00px;">
+                            <h2 class="text-2xl font-bold mb-4">Quizzes Per Category</h2>
+                            <div class="w-full flex justify-center">
+                                <canvas id="quizChart" style="width:100%;max-width:900px;height:300px !important;"></canvas>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
                 <!-- Quiz Creation Section (shown when Create Quiz is clicked) -->
                 <div id="quiz-creation" class="<?= $show_quiz_form ? 'block' : 'hidden' ?>">
-                    <!-- Quiz Category Form -->
-                    <div class="bg-white shadow-lg p-6 rounded-lg mb-6 ">
-                        <h2 class="text-2xl font-bold mb-4">Add Quiz Category</h2>
-                        <form method="POST" class="space-y-4">
-                            <div>
-                                <label class="block font-medium">Category Name:</label>
-                                <input type="text" name="category_name" class="w-full p-2 border rounded" required>
-                            </div>
-                            <div>
-                                <label class="block font-medium">Description:</label>
-                                <textarea name="description" class="w-full p-2 border rounded" required></textarea>
-                            </div>
-                            <div>
-                                <label class="block font-medium">Timer (in minutes):</label>
-                                <input type="number" name="timer" class="w-full p-2 border rounded" required>
-                            </div>
-                            <button type="submit" name="add_category" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                                Add Category
-                            </button>
-                        </form>
-                    </div>
+                    <?php if (isset($_SESSION['message']) && $show_quiz_form): ?>
+                        <div id="success-message" class="bg-green-100 text-green-800 p-4 rounded mb-4">
+                            <?= $_SESSION['message'];
+                            unset($_SESSION['message']); ?>
+                        </div>
+                        <script>
+                            setTimeout(() => {
+                                const msg = document.getElementById('success-message');
+                                if (msg) msg.style.display = 'none';
+                            }, 5000);
+                        </script>
+                    <?php endif; ?>
 
-                    <!-- Main Quiz Creation Form -->
-                    <div class="bg-white shadow-lg p-6 rounded-lg mb-6">
-                        <h2 class="text-2xl font-bold mb-4">Quiz Information</h2>
-                        <form method="POST">
-                            <input type="hidden" name="add_quiz" value="1">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block font-medium mb-2">Category</label>
+                    <h2 class="text-2xl font-bold mb-4">Quiz Information</h2>
+                    <form method="POST">
+                        <input type="hidden" name="add_quiz" value="1">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block font-medium mb-2">Category</label>
+                                <div class="flex items-center gap-2">
                                     <select name="category_id" class="w-full p-2 border rounded" required>
                                         <?php foreach ($categories as $cat): ?>
                                             <option value="<?= $cat['id'] ?>"><?= $cat['name'] ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <button type="button" id="add-category-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                                        Add
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="block font-medium mb-2">Quiz Title</label>
-                                    <input type="text" name="title" class="w-full p-2 border rounded" required>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label class="block font-medium mb-2">Description</label>
-                                    <textarea name="quiz_description" class="w-full p-2 border rounded" rows="3"></textarea>
-                                </div>
-                                <div>
-                                    <label class="block font-medium mb-2">Timer (minutes)</label>
-                                    <input type="number" name="quiz_timer" class="w-full p-2 border rounded" value="10" required>
+                                <div id="add-category-form" class="mt-2 hidden">
+                                    <input type="text" id="new-category-name" class="w-full p-2 border rounded mb-2" placeholder="Enter new category name">
+                                    <button type="button" id="save-category-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                        Save
+                                    </button>
                                 </div>
                             </div>
-                            <div class="mt-6">
-                                <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
-                                    Create Quiz
-                                </button>
+                            <div>
+                                <label class="block font-medium mb-2">Quiz Title</label>
+                                <input type="text" name="title" class="w-full p-2 border rounded" required>
                             </div>
-                        </form>
-                    </div>
-                    <div class="bg-white shadow-lg p-6 rounded-lg">
-                        <h2 class="text-2xl font-bold mb-4">Add Questions</h2>
-                        <?php if (isset($_SESSION['message'])): ?>
-                            <div id="success-message" class="bg-green-100 text-green-800 p-4 rounded mb-4">
-                                <?= $_SESSION['message'];
-                                unset($_SESSION['message']); ?>
+                            <div class="md:col-span-2">
+                                <label class="block font-medium mb-2">Description</label>
+                                <textarea name="quiz_description" class="w-full p-2 border rounded" rows="3"></textarea>
                             </div>
-                            <script>
-                                setTimeout(() => {
-                                    document.getElementById('success-message').style.display = 'none';
-                                }, 3000); // Hide after 3 seconds
-                            </script>
-                        <?php endif; ?>
-                        <form id="questions-form" method="POST" action="dashboard.php?action=create_quiz">
-                            <!-- Select Quiz Category -->
-                            <div class="mb-4">
-                                <label class="block font-medium mb-2">Select Quiz Category</label>
-                                <select id="quiz_category" name="quiz_category" class="w-full p-2 border rounded" required onchange="fetchQuizTitles(this.value)">
-                                    <option value="">Select a category</option>
-                                    <?php foreach ($categories as $cat): ?>
-                                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div>
+                                <label class="block font-medium mb-2">Timer (minutes)</label>
+                                <input type="number" name="quiz_timer" class="w-full p-2 border rounded" value="10" required>
                             </div>
+                        </div>
+                        <div class="mt-6">
+                            <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                                Create Quiz
+                            </button>
+                        </div>
+
+                    </form>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', () => {
+                            // Get references to the buttons and input field
+                            const addCategoryBtn = document.getElementById('add-category-btn'); // Button to toggle the form
+                            const addCategoryForm = document.getElementById('add-category-form'); // The form to add a new category
+                            const saveCategoryBtn = document.getElementById('save-category-btn'); // Button to save the category
+                            const newCategoryName = document.getElementById('new-category-name'); // Input field for the category name
+
+                            // Toggle the visibility of the "Add Category" form
+                            addCategoryBtn.addEventListener('click', () => {
+                                addCategoryForm.classList.toggle('hidden'); // Show or hide the form
+                            });
+
+                            // Handle the "Save" button click
+                            saveCategoryBtn.addEventListener('click', () => {
+                                const categoryName = newCategoryName.value.trim(); // Get the trimmed category name
+
+                                // Check if the category name is not empty
+                                if (categoryName) {
+                                    // Show a loading spinner
+                                    saveCategoryBtn.innerHTML = 'Saving...';
+                                    saveCategoryBtn.disabled = true;
+
+                                    // Send an AJAX request to add the category
+                                    fetch('add_category.php', {
+                                            method: 'POST', // HTTP method
+                                            headers: {
+                                                'Content-Type': 'application/x-www-form-urlencoded', // Content type
+                                            },
+                                            body: `name=${encodeURIComponent(categoryName)}`, // Payload
+                                        })
+                                        .then(response => response.json()) // Parse the JSON response
+                                        .then(data => {
+                                            if (data.success) {
+                                                // Show success message
+                                                alert('Category added successfully!');
+
+                                                // Add the new category to the dropdown
+                                                const categoryDropdown = document.querySelector('select[name="category_id"]');
+                                                const newOption = document.createElement('option');
+                                                newOption.value = data.category_id; // Assuming the response contains the new category ID
+                                                newOption.textContent = categoryName;
+                                                categoryDropdown.appendChild(newOption);
+
+                                                // Reset the input field and hide the form
+                                                newCategoryName.value = '';
+                                                addCategoryForm.classList.add('hidden');
+                                            } else {
+                                                // Show error message if the request failed
+                                                alert('Failed to add category: ' + data.message);
+                                            }
+                                        })
+                                        .catch(error => {
+                                            // Handle any errors during the request
+                                            console.error('Error adding category:', error);
+                                            alert('An error occurred while adding the category.');
+                                        })
+                                        .finally(() => {
+                                            // Reset the button text and state
+                                            saveCategoryBtn.innerHTML = 'Save';
+                                            saveCategoryBtn.disabled = false;
+                                        });
+                                } else {
+                                    // Show an alert if the category name is empty
+                                    alert('Please enter a category name.');
+                                }
+                            });
+                        });
+                    </script>
+                    </form>
+                    <br>
+                    <br>
+                    <br>
+                    <h2 class="text-2xl font-bold mb-4">Add Questions</h2>
+                    <?php if (isset($_SESSION['message']) && $show_quiz_form): ?>
+                        <div id="success-message" class="bg-green-100 text-green-800 p-4 rounded mb-4">
+                            <?= $_SESSION['message'];
+                            unset($_SESSION['message']); ?>
+                        </div>
+                        <script>
+                            setTimeout(() => {
+                                const msg = document.getElementById('success-message');
+                                if (msg) msg.style.display = 'none';
+                            }, 5000);
+                        </script>
+                    <?php endif; ?>
+                    <form id="questions-form" method="POST" action="dashboard.php?action=create_quiz">
+                        <!-- Select Quiz Category -->
+                        <div class="mb-4">
+                            <label class="block font-medium mb-2">Select Quiz Category</label>
+                            <select id="quiz_category" name="quiz_category" class="w-full p-2 border rounded" required onchange="fetchQuizTitles(this.value)">
+                                <option value="">Select a category</option>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+
 
                             <!-- Select Quiz Title -->
                             <div class="mb-4">
@@ -697,21 +782,20 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             <button type="submit" name="add_all_questions" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
                                 Add All Questions
                             </button>
-                        </form>
-                    </div>
+                    </form>
+                </div>
 
-                    <script>
-                     
-                     document.addEventListener('DOMContentLoaded', () => {
-    const questionsContainer = document.getElementById('questions-container');
-    const addNewQuestionButton = document.getElementById('add-new-question');
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const questionsContainer = document.getElementById('questions-container');
+                        const addNewQuestionButton = document.getElementById('add-new-question');
 
-    function addNewQuestionForm() {
-        const questionIndex = questionsContainer.children.length;
-        const questionForm = document.createElement('div');
-        questionForm.classList.add('mb-4', 'p-4', 'border', 'rounded', 'bg-gray-100');
+                        function addNewQuestionForm() {
+                            const questionIndex = questionsContainer.children.length;
+                            const questionForm = document.createElement('div');
+                            questionForm.classList.add('mb-4', 'p-4', 'border', 'rounded', 'bg-gray-100');
 
-        questionForm.innerHTML = `
+                            questionForm.innerHTML = `
             <h3 class="font-medium mb-2">Question ${questionIndex + 1}</h3>
             <div class="mb-4">
                 <label class="block font-medium mb-2">Question Text</label>
@@ -730,54 +814,53 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 Remove Question
             </button>
         `;
-        questionsContainer.appendChild(questionForm);
+                            questionsContainer.appendChild(questionForm);
 
-        questionForm.querySelector('.remove-question').addEventListener('click', () => {
-            questionForm.remove();
-        });
+                            questionForm.querySelector('.remove-question').addEventListener('click', () => {
+                                questionForm.remove();
+                            });
 
-        updateInputFields(questionForm.querySelector('.question-type'));
-    }
+                            updateInputFields(questionForm.querySelector('.question-type'));
+                        }
 
-    addNewQuestionButton.addEventListener('click', addNewQuestionForm);
+                        addNewQuestionButton.addEventListener('click', addNewQuestionForm);
 
-    window.updateInputFields = function (selectElement) {
-        const questionIndex = selectElement.name.match(/\[(\d+)\]/)[1];
-        const questionType = selectElement.value;
-        const inputFieldsContainer = selectElement.closest('div').nextElementSibling;
+                        window.updateInputFields = function(selectElement) {
+                            const questionIndex = selectElement.name.match(/\[(\d+)\]/)[1];
+                            const questionType = selectElement.value;
+                            const inputFieldsContainer = selectElement.closest('div').nextElementSibling;
 
-        inputFieldsContainer.innerHTML = '';
+                            inputFieldsContainer.innerHTML = '';
 
-        if (questionType === 'checkbox' || questionType === 'radio') {
-            for (let i = 1; i <= 4; i++) {
-                const optionDiv = document.createElement('div');
-                const inputName = `questions[${questionIndex}][options][${i}][text]`;
-                const correctName = questionType === 'checkbox'
-                    ? `questions[${questionIndex}][options][${i}][correct]`
-                    : `questions[${questionIndex}][correct_option]`;
+                            if (questionType === 'checkbox' || questionType === 'radio') {
+                                for (let i = 1; i <= 4; i++) {
+                                    const optionDiv = document.createElement('div');
+                                    const inputName = `questions[${questionIndex}][options][${i}][text]`;
+                                    const correctName = questionType === 'checkbox' ?
+                                        `questions[${questionIndex}][options][${i}][correct]` :
+                                        `questions[${questionIndex}][correct_option]`;
 
-                optionDiv.innerHTML = `
+                                    optionDiv.innerHTML = `
                     <label class="flex items-center">
                         <input type="${questionType}" name="${correctName}" value="${i}" class="mr-2" ${questionType === 'checkbox' ? '' : 'required'}>
                         <input type="text" name="${inputName}" class="w-full p-2 border rounded" placeholder="Option ${i}" required>
                     </label>
                 `;
-                inputFieldsContainer.appendChild(optionDiv);
-            }
-        } else if (questionType === 'text') {
-            const textInputDiv = document.createElement('div');
-            textInputDiv.innerHTML = `
+                                    inputFieldsContainer.appendChild(optionDiv);
+                                }
+                            } else if (questionType === 'text') {
+                                const textInputDiv = document.createElement('div');
+                                textInputDiv.innerHTML = `
                 <label class="block font-medium mb-2">Answer</label>
                 <input type="text" name="questions[${questionIndex}][text_answer]" class="w-full p-2 border rounded" placeholder="Enter the answer" required>
             `;
-            inputFieldsContainer.appendChild(textInputDiv);
-        }
-    };
-});
-
-                    </script>
-                    <!-- Filter Questions by Category -->
-                    <!-- <div class="bg-white shadow-lg p-6 rounded-lg mb-6">
+                                inputFieldsContainer.appendChild(textInputDiv);
+                            }
+                        };
+                    });
+                </script>
+                <!-- Filter Questions by Category -->
+                <!-- <div class="bg-white shadow-lg p-6 rounded-lg mb-6">
                         <h2 class="text-2xl font-bold mb-4">Filter Questions by Category</h2>
                         <form id="filter-form" method="GET" action="dashboard.php">
                             <input type="hidden" name="action" value="create_quiz">
@@ -798,8 +881,8 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         </form>
                     </div> -->
 
-                    <!-- Questions Table -->
-                    <!-- <div class="bg-white shadow-lg p-6 rounded-lg mt-6">
+                <!-- Questions Table -->
+                <!-- <div class="bg-white shadow-lg p-6 rounded-lg mt-6">
                         <h2 class="text-2xl font-bold mb-4">Questions</h2>
                         <div class="overflow-x-auto">
                             <table class="min-w-full border">
@@ -844,8 +927,8 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             </table>
                         </div> -->
 
-                    <!-- Pagination Controls -->
-                    <!-- <div class="flex justify-between items-center mt-6">
+                <!-- Pagination Controls -->
+                <!-- <div class="flex justify-between items-center mt-6">
                             <?php if ($current_page > 1): ?>
                                 <a href="dashboard.php?action=create_quiz<?= $filter_category ? '&filter_category=' . $filter_category : '' ?>&question_page=<?= $current_page - 1 ?>" 
                                    class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
@@ -866,87 +949,206 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                 <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Next</span>
                             <?php endif; ?>
                         </div> -->
-                </div>
             </div>
+        </div>
 
-            <!-- Results Section (shown when Results is clicked) -->
-            <div id="results-section" class="<?= $show_results ? 'block' : 'hidden' ?>">
+        <!-- Results Section (shown when Results is clicked) -->
+        <div id="results-section" class="<?= $show_results ? 'block' : 'hidden' ?>">
 
 
-                <!-- Results table showing user performance -->
-                <div class="bg-white shadow-lg p-6 rounded-lg">
-                    <h1 class="text-3xl font-bold text-center mb-6">Quiz Results</h1>
+            <!-- Results table showing user performance -->
+            <div class="bg-white shadow-lg p-6 rounded-lg">
+                <h1 class="text-3xl font-bold text-center mb-6">Quiz Results</h1>
 
-                    <!-- Filter Section -->
-                    <?php include 'filter_section.php'; ?>
+                <!-- Filter Section -->
+                <?php include 'filter_section.php'; ?>
 
-                    <!-- Results Table -->
-                    <?php include 'results_table.php'; ?>
-                </div>
+                <!-- Results Table -->
+                <?php include 'results_table.php'; ?>
             </div>
+        </div>
 
-            <!-- Categories Section (shown when Quiz Categories is clicked) -->
-            <div id="categories-section" class="<?= $show_categories ? 'block' : 'hidden' ?>">
-                <div id="categories-container">
-                    <h2 class="text-3xl font-bold text-center mb-6">Select Quiz Category</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                        <?php while ($row = $categories_result->fetch_assoc()): ?>
-                            <div class="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between">
-                                <h3 class="text-xl font-semibold mb-2"><?= htmlspecialchars($row['name']) ?></h3>
-                                <div class="flex justify-between items-center">
-                                    <a href="javascript:void(0);"
-                                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                        onclick="loadQuizzes(<?= $row['id'] ?>)">
-                                        View Quizzes
-                                    </a>
+        <!-- Categories Section (shown when Quiz Categories is clicked) -->
+        <div id="categories-section" class="<?= $show_categories ? 'block' : 'hidden' ?> data-category-id=<?= $row['id'] ?> ">
+            <div id="categories-container">
+                <h2 class="text-3xl font-extrabold text-center mb-10 text-[#342F90]">Select Quiz Category</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-8 px-4">
+                    <?php while ($row = $categories_result->fetch_assoc()): ?>
+                        <div class="bg-white border border-[#342F90]/20 rounded-2xl p-6 shadow-md flex flex-col justify-between transition hover:shadow-xl group" data-category-id="<?= $row['id'] ?>">
+                            <h3 class="text-xl font-semibold text-[#342F90] mb-4 category-name"><?= htmlspecialchars($row['name']) ?></h3>
 
-                                    <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="sr-only peer"
-                                            onchange="toggleCategory(<?= $row['id'] ?>)"
-                                            <?= $row['status'] ? 'checked' : '' ?>>
-                                        <div class="w-11 h-6 bg-gray-300 peer-focus:ring-4 rounded-full 
-                                                        peer-checked:bg-green-500 peer-checked:ring-green-300 
-                                                        peer:bg-red-500 peer:ring-red-300"></div>
-                                    </label>
+                            <div class="flex justify-between items-center mb-4">
+                                <a href="javascript:void(0);"
+                                    class="px-4 py-2 bg-[#342F90] text-white font-medium rounded-lg hover:bg-[#2a2875] transition"
+                                    onclick="loadQuizzes(<?= $row['id'] ?>)">
+                                    View Quizzes
+                                </a>
+
+                                <!-- Status Toggle -->
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer"
+                                        onchange="toggleCategory(<?= $row['id'] ?>)"
+                                        <?= $row['status'] ? 'checked' : '' ?>>
+                                    <div class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-[#342F90] transition duration-300"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex justify-between items-center mt-auto pt-4 border-t border-gray-100">
+                                <button onclick="openUpdateCategoryModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['name']) ?>')"
+                                    class="px-4 py-2 bg-blue-400 text-[#342F90] font-semibold rounded-lg hover:bg-blue-500 transition">
+                                    Update
+                                </button>
+
+                                <button onclick="deleteCategory(<?= $row['id'] ?>)"
+                                    class="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition">
+                                    Delete
+                                </button>
+                            </div>
+
+
+
+                            <!-- Update Modal  -->
+                            <div id="update-category-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+                                <div class="bg-white rounded-lg p-6 shadow-xl w-96">
+                                    <h2 class="text-2xl font-bold mb-4 text-[#342F90]">Update Category</h2>
+                                    <form onsubmit="updateCategory(event)">
+                                        <input type="hidden" id="update-category-id">
+                                        <div class="mb-4">
+                                            <label for="update-category-name" class="block text-gray-700 font-medium mb-1">Category Name</label>
+                                            <input type="text" id="update-category-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#342F90]" required>
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button type="button" onclick="closeUpdateCategoryModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 mr-2">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" class="px-4 py-2 bg-[#342F90] text-white rounded hover:bg-[#2a2875]">
+                                                Update
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
-                        <?php endwhile; ?>
-                    </div>
 
-                    <!-- Pagination Controls -->
-                    <div class="flex justify-between items-center mt-6">
-                        <?php if ($current_page > 1): ?>
-                            <a href="javascript:void(0);"
-                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                                onclick="loadCategories(<?= $current_page - 1 ?>)">
-                                Previous
-                            </a>
-                        <?php else: ?>
-                            <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Previous</span>
-                        <?php endif; ?>
 
-                        <span class="text-gray-700">Page <?= $current_page ?> of <?= $total_pages ?></span>
 
-                        <?php if ($current_page < $total_pages): ?>
-                            <a href="javascript:void(0);"
-                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                                onclick="loadCategories(<?= $current_page + 1 ?>)">
-                                Next
-                            </a>
-                        <?php else: ?>
-                            <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Next</span>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+
+                <script>
+                    // Open the Update Category Modal
+
+                    function openUpdateCategoryModal(categoryId, categoryName) {
+                        document.getElementById('update-category-id').value = categoryId;
+                        document.getElementById('update-category-name').value = categoryName;
+                        document.getElementById('update-category-modal').classList.remove('hidden');
+                    }
+
+                    function closeUpdateCategoryModal() {
+                        document.getElementById('update-category-modal').classList.add('hidden');
+                    }
+
+                    function updateCategory(event) {
+                        event.preventDefault();
+                        const id = document.getElementById('update-category-id').value;
+                        const name = document.getElementById('update-category-name').value.trim();
+
+                        if (!name) return alert("Please enter a valid category name.");
+
+                        fetch('update_category.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                body: `id=${id}&name=${encodeURIComponent(name)}`
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const catElem = document.querySelector(`[data-category-id="${id}"] .category-name`);
+                                    if (catElem) catElem.textContent = name;
+                                    closeUpdateCategoryModal();
+                                    alert('Category updated successfully.');
+                                } else {
+                                    alert("Failed to update category: " + data.message);
+                                }
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                alert("An error occurred while updating.");
+                            });
+                    }
+
+
+
+                    // Delete a Category
+                    function deleteCategory(categoryId) {
+                        if (confirm('Are you sure you want to delete this category?')) {
+                            fetch(`delete_category.php?id=${categoryId}`, {
+                                    method: 'GET',
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        alert('Category deleted successfully!');
+                                        location.reload(); // Reload the page to reflect changes
+                                    } else {
+                                        alert('Failed to delete category: ' + data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error deleting category:', error);
+                                    alert('An error occurred while deleting the category.');
+                                });
+                        }
+                    }
+                </script>
+
+
+
+                <!-- Pagination Controls -->
+                <div class="flex justify-between items-center mt-6">
+                    <?php if ($current_page > 1): ?>
+                        <a href="javascript:void(0);"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                            onclick="loadCategories(<?= $current_page - 1 ?>)">
+                            Previous
+                        </a>
+                    <?php else: ?>
+                        <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Previous</span>
+                    <?php endif; ?>
+
+                    <span class="text-gray-700">Page <?= $current_page ?> of <?= $total_pages ?></span>
+
+                    <?php if ($current_page < $total_pages): ?>
+                        <a href="javascript:void(0);"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                            onclick="loadCategories(<?= $current_page + 1 ?>)">
+                            Next
+                        </a>
+                    <?php else: ?>
+                        <span class="px-4 py-2 bg-gray-200 text-gray-500 rounded">Next</span>
+                    <?php endif; ?>
                 </div>
             </div>
-            <div id="quiz-display-section" class="hidden">
-                <button onclick="goBackToCategories()" class="bg-gray-500 text-white px-4 py-2 rounded mb-4">
-                    Back to Categories
-                </button>
-                <div id="quiz-display-content"></div>
-            </div>
-            <div id="questions-containern" class="hidden">
-
+        </div>
+        <div id="quiz-display-section" class="hidden">
+            <button onclick="goBackToCategories()" class="bg-gray-500 text-white px-4 py-2 rounded mb-4">
+                Back to Categories
+            </button>
+            <div id="quiz-display-content"></div>
+        </div>
+        <div id="questions-containern" class="hidden">
+            <button onclick="goBackToQuizzes()" class="bg-gray-500 text-white px-4 py-2 rounded mb-4">
+                Back to Quizzes
+            </button>
+            <div id="questions-content">
+                <!-- Questions will be dynamically loaded here -->
+                <div id="questions-containern" class="hidden">
+                    <button onclick="goBackToQuizzes()" class="bg-gray-500 text-white px-4 py-2 rounded mb-4">
+                        Back to Quizzes
+                    </button>
+                </div>
             </div>
             <!-- Mail Center Section (shown when Mail is clicked) -->
             <div id="mail-section" class="<?= isset($_GET['action']) && $_GET['action'] === 'mail' ? 'block' : 'hidden' ?>">
@@ -1150,7 +1352,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 });
         }
 
-       
+
         // Initialize the input fields on page load
         document.addEventListener('DOMContentLoaded', updateInputFields);
 
@@ -1389,85 +1591,86 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
 
         // Submit the question edit form
         function editQuestion(event) {
-    event.preventDefault();
+            event.preventDefault();
 
-    const questionId = document.getElementById('edit-question-id').value;
-    const questionText = document.getElementById('edit-question-text').value;
-    const questionType = document.getElementById('edit-question-type').value;
-    const option1 = document.getElementById('edit-option-1').value;
-    const option2 = document.getElementById('edit-option-2').value;
-    const option3 = document.getElementById('edit-option-3').value;
-    const option4 = document.getElementById('edit-option-4').value;
-    const correctOption = document.getElementById('edit-correct-option').value;
+            const questionId = document.getElementById('edit-question-id').value;
+            const questionText = document.getElementById('edit-question-text').value;
+            const questionType = document.getElementById('edit-question-type').value;
+            const option1 = document.getElementById('edit-option-1').value;
+            const option2 = document.getElementById('edit-option-2').value;
+            const option3 = document.getElementById('edit-option-3').value;
+            const option4 = document.getElementById('edit-option-4').value;
+            const correctOption = document.getElementById('edit-correct-option').value;
 
-    console.log({
-        id: questionId,
-        question_text: questionText,
-        question_type: questionType,
-        option_1: option1,
-        option_2: option2,
-        option_3: option3,
-        option_4: option4,
-        correct_option: correctOption
-    });
+            console.log({
+                id: questionId,
+                question_text: questionText,
+                question_type: questionType,
+                option_1: option1,
+                option_2: option2,
+                option_3: option3,
+                option_4: option4,
+                correct_option: correctOption
+            });
 
-    fetch('update_question.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            id: questionId,
-            question_text: questionText,
-            question_type: questionType,
-            option_1: option1,
-            option_2: option2,
-            option_3: option3,
-            option_4: option4,
-            correct_option: correctOption
-        }),
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Question updated successfully!');
+            fetch('update_question.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id: questionId,
+                        question_text: questionText,
+                        question_type: questionType,
+                        option_1: option1,
+                        option_2: option2,
+                        option_3: option3,
+                        option_4: option4,
+                        correct_option: correctOption
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Question updated successfully!');
 
-                // Update the question row dynamically in the DOM
-                const row = document.querySelector(`tr[data-id="${questionId}"]`);
-                if (row) {
-                    row.querySelector('.question-text').textContent = questionText;
-                    row.querySelector('.question-type').textContent = questionType;
-                    row.querySelector('.option-1').textContent = option1;
-                    row.querySelector('.option-2').textContent = option2;
-                    row.querySelector('.option-3').textContent = option3;
-                    row.querySelector('.option-4').textContent = option4;
-                   
+                        // Update the question row dynamically in the DOM
+                        const row = document.querySelector(`tr[data-id="${questionId}"]`);
+                        if (row) {
+                            row.querySelector('.question-text').textContent = questionText;
+                            row.querySelector('.question-type').textContent = questionType;
+                            row.querySelector('.option-1').textContent = option1;
+                            row.querySelector('.option-2').textContent = option2;
+                            row.querySelector('.option-3').textContent = option3;
+                            row.querySelector('.option-4').textContent = option4;
 
-                    // Update correct option dynamically
-                    if (questionType === 'checkbox') {
-                        const correctOptions = JSON.parse(correctOption);
-                        row.querySelector('.correct-option').textContent = correctOptions.map(opt => `Option ${opt}`).join(', ');
+
+                            // Update correct option dynamically
+                            if (questionType === 'checkbox') {
+                                const correctOptions = JSON.parse(correctOption);
+                                row.querySelector('.correct-option').textContent = correctOptions.map(opt => `Option ${opt}`).join(', ');
+                            } else {
+                                row.querySelector('.correct-option').textContent = `Option ${correctOption}`;
+                            }
+                        }
+
+                        // Close the modal
+                        closeEditModal1();
                     } else {
-                        row.querySelector('.correct-option').textContent = `Option ${correctOption}`;
+                        alert('Failed to update question: ' + data.message);
                     }
-                }
+                })
+                .catch(error => {
+                    console.error('Error updating question:', error);
+                    alert('An error occurred while updating the question.');
+                });
+        }
 
-                // Close the modal
-                closeEditModal1();
-            } else {
-                alert('Failed to update question: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error updating question:', error);
-            alert('An error occurred while updating the question.');
-        });
-}
         function deleteQuestion(id) {
             if (confirm('Are you sure you want to delete this question?')) {
                 fetch(`delete_question.php?id=${id}`, {
-                    method: 'GET',
-                })
+                        method: 'GET',
+                    })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -1488,8 +1691,40 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                     });
             }
         }
-     
-        
+   //dashboard loadusers
+        function loadUsersTable(page = 1) {
+            document.getElementById('users-table-modal').classList.remove('hidden');
+            document.getElementById('users-table-content').innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+            fetch(`fetch_users.php?page=${page}`)
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('users-table-content').innerHTML = html;
+                })
+                .catch(() => {
+                    document.getElementById('users-table-content').innerHTML = '<p class="text-center text-red-500">Failed to load users.</p>';
+                });
+        }
+
+        function closeUsersTable() {
+            document.getElementById('users-table-modal').classList.add('hidden');
+        }
+//dashboard load categories
+        function loadCategoriesTable(page = 1) {
+            document.getElementById('categories-table-modal').classList.remove('hidden');
+            document.getElementById('categories-table-content').innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+            fetch(`fetch_categories_table.php?page=${page}`)
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('categories-table-content').innerHTML = html;
+                })
+                .catch(() => {
+                    document.getElementById('categories-table-content').innerHTML = '<p class="text-center text-red-500">Failed to load categories.</p>';
+                });
+        }
+
+        function closeCategoriesTable() {
+            document.getElementById('categories-table-modal').classList.add('hidden');
+        }
     </script>
 
 

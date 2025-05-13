@@ -3,27 +3,31 @@
 session_start();
 
 // Database connection
-$conn = new mysqli('localhost', 'root', '', 'quiz_system');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require 'includes/config.php';
 
 // Set JSON header
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $category_name = $_POST['category_name'] ?? '';
-    $description = $_POST['description'] ?? '';
-    $timer = $_POST['timer'] ?? 0;
+    // Get the category name from the POST request
+    $category_name = isset($_POST['name']) ? trim($_POST['name']) : '';
 
+    // Validate the category name
     if (empty($category_name)) {
-        echo json_encode(['success' => false, 'message' => 'Category name is required.']);
+        echo json_encode(['success' => false, 'message' => 'Category name cannot be empty.']);
         exit;
     }
 
-    $stmt = $conn->prepare("INSERT INTO quiz_categories (name, description, timer) VALUES (?, ?, ?)");
-    $stmt->bind_param("ssi", $category_name, $description, $timer);
+    // Prepare the SQL query to insert the category
+    $stmt = $conn->prepare("INSERT INTO quiz_categories (name) VALUES (?)");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Failed to prepare the SQL statement.']);
+        exit;
+    }
 
+    $stmt->bind_param("s", $category_name);
+
+    // Execute the query and check for errors
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Category added successfully!']);
     } else {

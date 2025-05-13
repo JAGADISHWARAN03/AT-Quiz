@@ -1,3 +1,28 @@
+<?php
+require 'includes/config.php'; // Include database connection
+
+// Fetch results from the quiz_results1 table
+$query = "
+    SELECT 
+        qr.user_email, 
+        qr.city, 
+        qr.skill, 
+    
+       
+        qr.score AS total_score, 
+        qr.total_questions, 
+        (qr.score / qr.total_questions) * 100 AS percentage, 
+        qr.created_at AS exam_date
+    FROM 
+        quiz_results1 qr
+    JOIN 
+        quiz_categories qc ON qr.category_id = qc.id
+    ORDER BY 
+        qr.created_at DESC
+";
+$result = $conn->query($query);
+?>
+
 <div class="bg-white shadow-lg p-6 rounded-lg">
     <h2 class="text-2xl font-bold mb-4">Results</h2>
     <table class="min-w-full border">

@@ -34,17 +34,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_form'])) {
     $_SESSION['user_city'] = $city;
     $_SESSION['user_mobile'] = $mobile_no;
 
-    // Redirect to the same page to display questions
+    // Show the instruction modal
+    $_SESSION['show_instructions'] = true;
+
+    // Redirect to the same page to display the modal
+    header("Location: welcome.php?quiz_title_id=$quiz_title_id");
+    exit;
+}
+
+// Handle instruction agreement submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['agree_instructions'])) {
+    // User agreed to the instructions, hide the modal
+    $_SESSION['show_instructions'] = false;
+
+    // Redirect to the same page to display the quiz questions
     header("Location: welcome.php?quiz_title_id=$quiz_title_id");
     exit;
 }
 
 // Check if user details are already submitted
 $user_form_submitted = isset($_SESSION['user_name']);
+$show_instructions = isset($_SESSION['show_instructions']) && $_SESSION['show_instructions'] === true;
 
 // Fetch questions for the quiz based on quiz_title_id
 $questions = [];
-if ($user_form_submitted) {
+if ($user_form_submitted && !$show_instructions) {
     $stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4, correct_option FROM questions WHERE quiz_title_id = ?");
     $stmt->bind_param("i", $quiz_title_id);
     $stmt->execute();
@@ -64,6 +78,15 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aptitude Quiz</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function closeModal() {
+            document.getElementById('instruction-modal').classList.add('hidden');
+        }
+
+        function submitInstructions() {
+            document.getElementById('instruction-form').submit();
+        }
+    </script>
 </head>
 <body class="bg-white">
     <!-- Header -->
@@ -106,23 +129,27 @@ $conn->close();
                 </div>
                 <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
             </form>
-        <?php else: ?>
-            <!-- Quiz Questions -->
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 text-start mt-6">Aptitude Quiz</h1>
-            <form id="quiz-form" method="POST" action="submit_quiz1.php" class="bg-white shadow-lg p-6 rounded-lg border mt-4">
-                <?php foreach ($questions as $index => $question): ?>
-                    <div class="mb-6">
-                        <p class="font-medium"><?= ($index + 1) . ". " . htmlspecialchars($question['question_text']) ?></p>
-                        <?php for ($i = 1; $i <= 4; $i++): ?>
-                            <label class="block mt-2">
-                                <input type="radio" name="answers[<?= $question['id'] ?>]" value="<?= $i ?>" class="form-radio text-blue-600">
-                                <?= htmlspecialchars($question["option_$i"]) ?>
-                            </label>
-                        <?php endfor; ?>
-                    </div>
-                <?php endforeach; ?>
-                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Submit Quiz</button>
-            </form>
+        <?php elseif ($show_instructions): ?>
+            <!-- Instruction Modal -->
+            <div id="instruction-modal" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+                <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+                    <h2 class="text-xl font-bold mb-4">Instructions</h2>
+                    <p class="mb-4">Please read the instructions carefully before starting the quiz.</p>
+                    <ul class="list-disc pl-5 mb-4">
+                        <li>Each question has one correct answer.</li>
+                        <li>You cannot go back to previous questions.</li>
+                        <li>Submit the quiz once you are done.</li>
+                    </ul>
+                    <form id="instruction-form" method="POST" action="welcome.php?quiz_title_id=<?= $quiz_title_id ?>">
+                        <input type="hidden" name="agree_instructions" value="1">
+                        <label class="block mb-4">
+                            <input type="checkbox" name="agree" required> I have read and agree to the instructions.
+                        </label>
+                        <button type="button" onclick="submitInstructions()" class="bg-green-500 text-white px-4 py-2 rounded">Start Quiz</button>
+                    </form>
+                </div>
+            </div>
+      
         <?php endif; ?>
     </main>
 

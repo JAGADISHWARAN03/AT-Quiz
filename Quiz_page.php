@@ -19,7 +19,7 @@ $user = $result->fetch_assoc();
 $user_email = $user['email'];
 
 // Fetch questions for the quiz
-$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4, correct_option FROM questions WHERE quiz_category = ?");
+$stmt = $conn->prepare("SELECT id, question_text, option_1, option_2, option_3, option_4, correct_option, question_type FROM questions WHERE quiz_category = ?");
 $stmt->bind_param("i", $category_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -49,17 +49,51 @@ $conn->close();
             const nextButton = document.getElementById('next-button');
             const prevButton = document.getElementById('prev-button');
 
-            // Update question text and options
+            // Get the current question
             const question = questions[index];
-            questionContainer.innerHTML = `
-                <div class="mt-4">
-                    <p class="font-medium">${question.question_text}</p>
-                    ${['option_1', 'option_2', 'option_3', 'option_4'].map((option, i) => `
+
+            // Render the question based on its type
+            let optionsHtml = '';
+            if (question.question_type === 'multiple_choice') {
+                optionsHtml = ['option_1', 'option_2', 'option_3', 'option_4']
+                    .map((option, i) => `
                         <label class="block mt-2">
                             <input type="radio" name="answers[${question.id}]" value="${i + 1}" class="form-radio text-blue-600" onchange="markAnswered(${index})">
                             ${question[option]}
                         </label>
-                    `).join('')}
+                    `).join('');
+            } else if (question.question_type === 'true_false') {
+                optionsHtml = `
+                    <label class="block mt-2">
+                        <input type="radio" name="answers[${question.id}]" value="1" class="form-radio text-blue-600" onchange="markAnswered(${index})">
+                        True
+                    </label>
+                    <label class="block mt-2">
+                        <input type="radio" name="answers[${question.id}]" value="2" class="form-radio text-blue-600" onchange="markAnswered(${index})">
+                        False
+                    </label>
+                `;
+            } else if (question.question_type === 'short_answer') {
+                optionsHtml = `
+                    <label class="block mt-2">
+                        <textarea name="answers[${question.id}]" class="form-textarea w-full border rounded-md text-gray-800" rows="3" onchange="markAnswered(${index})"></textarea>
+                    </label>
+                `;
+            } else if (question.question_type === 'checkbox') {
+        optionsHtml = ['option_1', 'option_2', 'option_3', 'option_4']
+            .map((option, i) => `
+                <label class="block mt-2">
+                    <input type="checkbox" name="answers[${question.id}][]" value="${i + 1}" class="form-checkbox text-blue-600" onchange="markAnswered(${index})">
+                    ${question[option]}
+                </label>
+            `).join('');
+    }
+
+            // Update the question container
+            questionContainer.innerHTML = `
+                <div class="mt-4">
+                    <p class="font-medium">${question.question_text}</p>
+                    ${optionsHtml}
                 </div>
             `;
 
