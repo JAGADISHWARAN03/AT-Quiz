@@ -7,8 +7,7 @@ $query = "
         qr.user_email, 
         qr.city, 
         qr.skill, 
-    
-       
+        qc.name AS category_name,      -- Add this line
         qr.score AS total_score, 
         qr.total_questions, 
         (qr.score / qr.total_questions) * 100 AS percentage, 

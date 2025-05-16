@@ -20,22 +20,42 @@ $total_pages = ceil($total_categories / $categories_per_page);
 $output = '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">';
 while ($row = $categories_result->fetch_assoc()) {
     $output .= '
-        <div class="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between">
-            <h3 class="text-xl font-semibold mb-2">' . htmlspecialchars($row['name']) . '</h3>
-            <div class="flex justify-between items-center">
-                <a href="javascript:void(0);" 
-                   class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" 
-                   onclick="loadQuizzes(' . $row['id'] . ')">
-                    View Quizzes
-                </a>
-                <label class="relative inline-flex items-center cursor-pointer">
+        <div class="relative bg-white border border-gray-200 rounded-xl p-5 shadow-sm card-hover" data-category-id="' . $row['id'] . '">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800 category-name truncate">' . htmlspecialchars($row['name']) . '</h3>
+                <label class="custom-toggle">
                     <input type="checkbox" class="sr-only peer" 
                            onchange="toggleCategory(' . $row['id'] . ')" 
                            ' . ($row['status'] ? 'checked' : '') . '>
-                    <div class="w-11 h-6 bg-gray-300 peer-focus:ring-4 rounded-full 
-                                peer-checked:bg-green-500 peer-checked:ring-green-300 
-                                peer:bg-red-500 peer:ring-red-300"></div>
+                    <span class="slider"></span>
                 </label>
+            </div>
+            <div class="mb-4 flex gap-2">
+                <a href="javascript:void(0);" 
+                   class="block flex-1 text-center px-4 py-2 bg-indigo-500 text-white font-medium rounded-lg hover:bg-indigo-600 transition" 
+                   onclick="loadQuizzes(' . $row['id'] . ')">
+                    View Quizzes
+                </a>
+            </div>
+            <div class="flex justify-between items-end border-t border-gray-100 pt-3">
+                <button
+                    class="block px-4 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition"
+                    style="margin-right:auto;"
+                    onclick="openAddQuestionModal(' . $row['id'] . ', \'' . htmlspecialchars(addslashes($row['name'])) . '\')">
+                    Add Questions
+                </button>
+                <div class="flex space-x-3">
+                    <button onclick="openUpdateCategoryModal(' . $row['id'] . ', \'' . htmlspecialchars($row['name']) . '\')"
+                        class="icon-btn text-indigo-500 hover:text-indigo-600">
+                        <i class="fas fa-edit text-lg"></i>
+                        <span class="tooltip">Update</span>
+                    </button>
+                    <button onclick="deleteCategory(' . $row['id'] . ')"
+                        class="icon-btn text-red-500 hover:text-red-600">
+                        <i class="fas fa-trash text-lg"></i>
+                        <span class="tooltip">Delete</span>
+                    </button>
+                </div>
             </div>
         </div>';
 }
