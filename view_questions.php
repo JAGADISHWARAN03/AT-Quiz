@@ -11,7 +11,12 @@ $result = $stmt->get_result();
 ?>
 
 <div class="max-w-6xl mx-auto mt-10">
-    <h2 class="text-3xl font-bold text-center mb-6">Questions for Selected Quiz</h2>
+    <div class="flex items-center mb-4">
+        <button onclick="window.location.href='quiz_display.php'" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 mr-2">
+            &larr; Back
+        </button>
+        <h2 class="text-3xl font-bold text-center flex-1">Questions for Selected Quiz</h2>
+    </div>
 
     <!-- Questions Table -->
 

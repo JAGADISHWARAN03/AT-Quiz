@@ -34,7 +34,7 @@ if ($category_id > 0) {
             <tbody>
                 <?php if ($result->num_rows > 0): ?>
                     <?php while ($row = $result->fetch_assoc()): ?>
-                        <tr class="bg-white hover:bg-gray-50 transition">
+                        <tr class="bg-white hover:bg-gray-50 transition" data-quiz-id="<?= $row['id'] ?>">
                             <td class="p-3 border text-gray-800 truncate"><?= htmlspecialchars($row['title']) ?></td>
                             <td class="p-3 border text-gray-800 break-words"><?= htmlspecialchars($row['description']) ?></td>
                             <td class="p-3 border text-center"><?= htmlspecialchars($row['timer']) ?> min</td>

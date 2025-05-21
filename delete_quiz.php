@@ -1,5 +1,7 @@
 <!-- filepath: c:\xampp\htdocs\ar\delete_quiz.php -->
 <?php
+ob_clean();
+header('Content-Type: application/json');
 include 'includes/config.php'; // Include database connection
 
 if (isset($_GET['id'])) {

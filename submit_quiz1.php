@@ -54,11 +54,8 @@ $stmt->fetch();
 $stmt->close();
 
 // Store the results in the database
-$stmt = $conn->prepare("INSERT INTO quiz_results1 (user_email, category_id, score, total_questions, city, skill) VALUES (?, ?, ?, ?, ?, ?)");
-if (!$stmt) {
-    die("Prepare failed: " . $conn->error);
-}
-$stmt->bind_param("siisss", $user_email, $category_id, $score, $total_questions, $user_city, $skill); // Corrected the type string and variables
+$stmt = $conn->prepare("INSERT INTO quiz_results1 (user_email, category_id, score, total_questions, city, skill, quiz_title_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+$stmt->bind_param("siisssi", $user_email, $category_id, $score, $total_questions, $user_city, $skill, $quiz_title_id);
 if (!$stmt->execute()) {
     die("Execute failed: " . $stmt->error);
 }

@@ -30,7 +30,7 @@ $categories_result = $conn->query($categories_query);
 $total_pages = ceil($total_categories / $categories_per_page);
 
 // Fetch total number of registered users
-$total_users_query = "SELECT COUNT(*) AS total_users FROM users";
+$total_users_query = "SELECT COUNT(*) AS total_users FROM quiz_results1 WHERE DATE(created_at) = CURDATE()";
 $total_users_result = $conn->query($total_users_query);
 $total_users = $total_users_result->fetch_assoc()['total_users'];
 
@@ -259,6 +259,11 @@ while ($row = $quiz_count_result->fetch_assoc()) {
     $quiz_chart_categories[] = $row['category_name'];
     $quiz_chart_counts[] = (int)$row['quiz_count'];
 }
+
+
+$total_users_all_query = "SELECT COUNT(*) AS total FROM users";
+$total_users_all_result = $conn->query($total_users_all_query);
+$total_users_all = $total_users_all_result ? $total_users_all_result->fetch_assoc()['total'] : 0;
 $conn->close();
 
 // Determine which section to show based on URL parameters
@@ -409,6 +414,10 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
             max-width: 800px;
             /* Constrain width for better readability */
             width: 100%;
+        }
+
+        tr:hover {
+            background: none !important;
         }
     </style>
 
@@ -664,13 +673,15 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
     }
 
     function generateQuizLink(quizId) {
-        const link = `user_form.php?quiz_title_id=${quizId}`;
+        // The link should start from index.php, passing quiz_title_id as a parameter
+        // The rest of the flow (user_form.php, instruction.php, Quizz_page.php, thank you page) is handled by your backend/app logic
+        const link = `index.php?quiz_title_id=${quizId}`;
         const linkSpan = document.getElementById(`quiz-link-${quizId}`);
         linkSpan.innerHTML = `
-                <a href="${link}" class="text-blue-500 underline hover:text-blue-700" target="_blank">
-                    View Quiz
-                </a>
-            `;
+            <a href="${link}" class="text-blue-500 underline hover:text-blue-700" target="_blank">
+                Start Quiz
+            </a>
+        `;
         linkSpan.classList.remove('hidden');
     }
 
@@ -683,7 +694,9 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 .then(data => {
                     if (data.success) {
                         alert('Quiz deleted successfully!');
-                        location.reload();
+                        // Remove the row from the DOM
+                        const row = document.querySelector(`[data-quiz-id="${quizId}"]`);
+                        if (row) row.remove();
                     } else {
                         alert('Failed to delete quiz: ' + data.message);
                     }
@@ -879,8 +892,26 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
             });
     }
 
-    function closeCategoriesTable() {
-        document.getElementById('categories-table-modal').classList.add('hidden');
+
+    function loadCategories1(page = 1) {
+        document.getElementById('categories-modal').classList.remove('hidden');
+        document.getElementById('categories-content').innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+        fetch(`fetch_categories.php?page=${page}`)
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('categories-content').innerHTML = html;
+            })
+            .catch(() => {
+                document.getElementById('categories-content').innerHTML = '<p class="text-center text-red-500">Failed to load categories.</p>';
+            });
+    }
+
+
+
+
+
+    function closeCategories1() {
+        document.getElementById('categories-modal').classList.add('hidden');
     }
 
     function openUpdateCategoryModal(categoryId, categoryName) {
@@ -1163,6 +1194,47 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                 alert('Failed to add quiz.');
             });
     });
+
+
+
+    function openEditUserModal(userId, userEmail) {
+        const newEmail = prompt('Update Email:', userEmail);
+        if (newEmail && newEmail !== userEmail) {
+            fetch('update_user.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `id=${userId}&email=${encodeURIComponent(newEmail)}`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('User updated successfully!');
+                        loadUsersTableWithActions(); // reload table
+                    } else {
+                        alert('Failed to update user: ' + data.message);
+                    }
+                });
+        }
+    }
+
+    function deleteUser(userId) {
+        if (confirm('Are you sure you want to delete this user?')) {
+            fetch(`delete_user.php?id=${userId}`, {
+                    method: 'GET'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('User deleted successfully!');
+                        loadUsersTableWithActions(); // reload table
+                    } else {
+                        alert('Failed to delete user: ' + data.message);
+                    }
+                });
+        }
+    }
 </script>
 
 
@@ -1251,7 +1323,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
 
 
 
-                    <!-- Stats cards -->
+                    <!-- Stats cards      -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white p-6 rounded-xl shadow-sm card-hover"
                             onclick="loadUsersTable(1)">
@@ -1268,47 +1340,132 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         </div>
                         <div id="users-table-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
                             <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative">
-                                <button onclick="closeUsersTable()" class="absolute top-2 right-2 text-gray-500 hover:text-[var(--secondary-color)] text-2xl">×</button>
-                                <h2 class="text-2xl font-bold mb-4 text-[var(--primary-color)]">Registered Users</h2>
+                                <button onclick="closeUsersTable()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                                <h2 class="text-2xl font-bold mb-4 text-[var(--primary-color)]"> Today Attempts </h2>
                                 <div id="users-table-content"></div>
                             </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-xl shadow-sm card-hover"
-                            onclick="loadCategoriesTable(1)">
-                            <div class="flex items-center space-x-4">
+                        <div class="bg-white p-6 rounded-xl shadow-sm card-hover">
+                            <div class="flex items-center space-x-4" onclick="loadCategories1(1)">
                                 <div class="bg-blue-100 p-3 rounded-full">
                                     <i class="fas fa-list text-2xl text-blue-500"></i>
                                 </div>
                                 <div>
                                     <h3 class="font-semibold text-gray-600">New Participants</h3>
-                                    <p class="text-3xl font-bold text-gray-800"><?= count($categories) ?></p>
-
+                                    <p class="text-3xl font-bold text-gray-800"><?= $total_users ?></p>
                                 </div>
                             </div>
                         </div>
-                        <div id="categories-table-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+                        <div id="categories-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
                             <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative">
-                                <button onclick="closeCategoriesTable()" class="absolute top-2 right-2 text-gray-500 hover:text-[var(--secondary-color)] text-2xl">×</button>
-                                <h2 class="text-2xl font-bold mb-4 text-[var(--primary-color)]">Quiz Categories</h2>
-                                <div id="categories-table-content"></div>
+                                <button onclick="closeCategories1()" class="absolute top-2 right-2 text-gray-500 hover:text-[var(--secondary-color)] text-2xl">×</button>
+                                <h2 class="text-2xl font-bold mb-4 text-[var(--primary-color)]"> New Participants </h2>
+                                <div id="categories-content">
+                                    <!-- Content will be loaded here via fetch_categories.php -->
+                                </div>
                             </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-xl shadow-sm card-hover">
+                        <!-- Total Users Card -->
+                        <!-- In your HTML where you want the card -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm card-hover" onclick="loadUsersTableWithActions(1)">
                             <div class="flex items-center space-x-4">
                                 <div class="bg-yellow-100 p-3 rounded-full">
                                     <i class="fas fa-book text-2xl text-yellow-500"></i>
                                 </div>
                                 <div>
-                                    <h3 class="font-semibold text-gray-600">Total Participants</h3>
-                                    <p class="text-3xl font-bold text-gray-800"><?= count($quizzes) ?></p>
-
+                                    <h3 class="font-semibold text-gray-600">Total Users</h3>
+                                    <p class="text-3xl font-bold text-gray-800" id="total-users-count">
+                                        <?= $total_users_all ?>
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
+                        <!-- Users Table Modal with Update/Delete/Search -->
+                        <div id="users-table-modal-actions" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+                            <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 relative">
+                                <button onclick="closeUsersTableWithActions()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                                <h2 class="text-2xl font-bold mb-4 text-[var(--primary-color)]">All Users</h2>
+                                <div class="mb-4 flex flex-col md:flex-row gap-2">
+                                    <input type="text" id="user-search-input" class="border rounded-lg p-2 flex-1" placeholder="Search by ID or Email...">
+                                    <button onclick="searchUsersTable()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">Search</button>
+                                </div>
+                                <div id="users-table-content-actions"></div>
+                            </div>
+                        </div>
+
+                        <script>
+                            // Open users table modal with actions
+                            function loadUsersTableWithActions(page = 1, search = '') {
+                                document.getElementById('users-table-modal-actions').classList.remove('hidden');
+                                document.getElementById('users-table-content-actions').innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+                                fetch(`fetch_users_table.php?page=${page}&search=${encodeURIComponent(search)}`)
+                                    .then(res => res.text())
+                                    .then(html => {
+                                        document.getElementById('users-table-content-actions').innerHTML = html;
+                                    })
+                                    .catch(() => {
+                                        document.getElementById('users-table-content-actions').innerHTML = '<p class="text-center text-red-500">Failed to load users.</p>';
+                                    });
+                            }
+
+                            function closeUsersTableWithActions() {
+                                document.getElementById('users-table-modal-actions').classList.add('hidden');
+                            }
+
+                            function searchUsersTable() {
+                                const search = document.getElementById('user-search-input').value.trim();
+                                loadUsersTableWithActions(1, search);
+                            }
+                            // Update user
+                            function openEditUserModal(userId, userEmail) {
+                                const newEmail = prompt('Update Email:', userEmail);
+                                if (newEmail && newEmail !== userEmail) {
+                                    fetch('update_user.php', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/x-www-form-urlencoded'
+                                            },
+                                            body: `id=${userId}&email=${encodeURIComponent(newEmail)}`
+                                        })
+                                        .then(res => res.json())
+                                        .then(data => {
+                                            if (data.success) {
+                                                alert('User updated successfully!');
+                                                searchUsersTable();
+                                            } else {
+                                                alert('Failed to update user: ' + data.message);
+                                            }
+                                        });
+                                }
+                            }
+                            // Delete user
+                            function deleteUser(userId) {
+                                if (confirm('Are you sure you want to delete this user?')) {
+                                    fetch(`delete_user.php?id=${userId}`, {
+                                            method: 'GET'
+                                        })
+                                        .then(res => res.json())
+                                        .then(data => {
+                                            if (data.success) {
+                                                alert('User deleted successfully!');
+                                                searchUsersTable();
+                                            } else {
+                                                alert('Failed to delete user: ' + data.message);
+                                            }
+                                        });
+                                }
+                            }
+                            // Enter key triggers search
+                            document.addEventListener('DOMContentLoaded', function() {
+                                document.getElementById('user-search-input').addEventListener('keydown', function(e) {
+                                    if (e.key === 'Enter') searchUsersTable();
+                                });
+                            });
+                        </script>
+                    </div>
                     <!-- Quiz Stats Section -->
                     <div class="bg-white p-6 rounded-xl shadow-sm mb-8">
                         <div class="flex justify-between items-center mb-4">
@@ -1351,15 +1508,7 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-blue-50 p-4 rounded-lg flex items-center space-x-4 mb-6">
-                            <div class="bg-blue-100 p-3 rounded-full">
-                                <i class="fas fa-question-circle text-xl text-blue-500"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-600">Quiz Name</p>
-                                <p id="quiz-name" class="text-lg font-semibold text-gray-800">N/A</p>
-                            </div>
-                        </div>
+                       
 
                         <div class="flex space-x-4 mb-4">
                             <div>
@@ -1372,10 +1521,65 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                             </div>
                         </div>
                         <button onclick="loadChartData()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition mb-6">Load Data</button>
-                        <div class="w-full">
-                            <canvas id="quizChart" style="width:100%; height:200px;"></canvas>
+                        <div class="w-full" style="max-width: 100%;">
+                            <canvas id="quizChart" width="800" height="300" style="max-width:100%;"></canvas>
                         </div>
                     </div>
+
+                    <script>
+                        let quizChart;
+
+                        function loadChartData() {
+                            const startDate = document.getElementById('start-date').value;
+                            const endDate = document.getElementById('end-date').value;
+                            const params = new URLSearchParams();
+                            if (startDate) params.append('start_date', startDate);
+                            if (endDate) params.append('end_date', endDate);
+
+                            fetch('get_quiz_usage_stats.php?' + params.toString())
+                                .then(res => res.json())
+                                .then(data => {
+                                    const ctx = document.getElementById('quizChart').getContext('2d');
+                                    if (quizChart) quizChart.destroy();
+
+                                    quizChart = new Chart(ctx, {
+                                        type: 'bar',
+                                        data: {
+                                            labels: data.titles,
+                                            datasets: [{
+                                                label: 'Quiz Attempts',
+                                                data: data.counts,
+                                                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                                borderColor: 'rgba(54, 162, 235, 1)',
+                                                borderWidth: 1
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false, // <-- This keeps the chart size fixed
+                                            plugins: {
+                                                legend: {
+                                                    display: false
+                                                },
+                                                title: {
+                                                    display: true,
+                                                    text: 'Quiz Performance by Title'
+                                                }
+                                            },
+                                            scales: {
+                                                y: {
+                                                    beginAtZero: true,
+                                                    stepSize: 1
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                        }
+
+                        // Optionally, load chart on page load:
+                        document.addEventListener('DOMContentLoaded', loadChartData);
+                    </script>
 
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {
@@ -1700,7 +1904,27 @@ $show_categories = isset($_GET['action']) && $_GET['action'] === 'categories';
                         <?php include 'results_table.php'; ?>
                     </div>
                 </div>
+                <script>
+                    document.getElementById('results-filter-form').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const form = e.target;
+                        const formData = new FormData(form);
+                        const params = new URLSearchParams(formData).toString();
 
+                        // Show loading indicator
+                        const tableContainer = document.getElementById('results-table-container');
+                        tableContainer.innerHTML = '<p class="text-center text-gray-500">Loading...</p>';
+
+                        fetch('results_table.php?' + params)
+                            .then(res => res.text())
+                            .then(html => {
+                                tableContainer.innerHTML = html;
+                            })
+                            .catch(() => {
+                                tableContainer.innerHTML = '<p class="text-center text-red-500">Failed to load results.</p>';
+                            });
+                    });
+                </script>
                 <!-- Categories Section -->
                 <div id="categories-section" class="<?= $show_categories ? 'block' : 'hidden' ?>">
                     <div id="categories-container">
